@@ -23,7 +23,7 @@ body {
 .navbar-fixed-top {
     border: 0;
 }
-#main {
+.main {
     display: none;
 }
 .page-content {
@@ -99,6 +99,12 @@ table tr:first-child th {
 }
 .table-hover tbody tr:hover td, .table-hover tbody tr:hover th {
     background-color: #FFFFCC;
+}
+.table td.tight, .table th.tight {
+    width: 1%;
+}
+.table td.expand, .table th.expand {
+    width: 10%;
 }
 .login-modal-header .close {
     font-size: 36px;
@@ -267,6 +273,9 @@ h4 {
 .severity-info-bg {
     background: #357abd none;
 }
+.severity-unassigned-bg, .severity-unknown-bg {
+    background: #c0c0c0 none;
+}
 .label-sm {
     font-size: 75%;
 }
@@ -275,6 +284,42 @@ h4 {
 }
 .label-lg {
     font-size: 125%;
+}
+.label-source-nvd {
+    font-weight: normal;
+    color: #222222;
+    background-color: #AECEE5;
+    border: 1px solid #5C9CCB;
+}
+.label-source-nsp {
+    font-weight: normal;
+    color: #222222;
+    background-color: #B4AFE4;
+    border: 1px solid #6E63CC;
+}
+.label-source-retire {
+    font-weight: normal;
+    color: #222222;
+    background-color: #AFE4BF;
+    border: 1px solid #73D08F;
+}
+.label-source-vulndb {
+    font-weight: normal;
+    color: #222222;
+    background-color: #FFC78B;
+    border: 1px solid #FE9536;
+}
+.label-source-victims {
+    font-weight: normal;
+    color: #222222;
+    background-color: #E4AFAF;
+    border: 1px solid #CC6666;
+}
+.label-source-manual {
+    font-weight: normal;
+    color: #222222;
+    background-color: #EBE5A8;
+    border: 1px solid #DCD167;
 }
 .widget {
     background: #efefef;

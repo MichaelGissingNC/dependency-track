@@ -459,27 +459,13 @@ public class QueryManager extends AlpineQueryManager {
 
     /**
      * Creates a new License.
-     * @param transientLicense the License object to create
+     * @param license the License object to create
      * @param commitIndex specifies if the search index should be committed (an expensive operation)
      * @return a created License object
      */
-    public License createLicense(License transientLicense, boolean commitIndex) {
-        pm.currentTransaction().begin();
-        final License license = new License();
-        license.setComment(transientLicense.getComment());
-        license.setDeprecatedLicenseId(transientLicense.isDeprecatedLicenseId());
-        license.setHeader(transientLicense.getHeader());
-        license.setOsiApproved(transientLicense.isOsiApproved());
-        license.setLicenseId(transientLicense.getLicenseId());
-        license.setName(transientLicense.getName());
-        license.setTemplate(transientLicense.getTemplate());
-        license.setText(transientLicense.getText());
-        license.setSeeAlso(transientLicense.getSeeAlso());
-        pm.makePersistent(license);
-        pm.currentTransaction().commit();
-        pm.getFetchPlan().setDetachmentOptions(FetchPlan.DETACH_LOAD_FIELDS);
-        final License result = pm.getObjectById(License.class, license.getId());
-        SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.CREATE, pm.detachCopy(result)));
+    public License createLicense(License license, boolean commitIndex) {
+        final License result = persist(license);
+        SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.CREATE, result));
         commitSearchIndex(commitIndex, License.class);
         return result;
     }
@@ -491,12 +477,8 @@ public class QueryManager extends AlpineQueryManager {
      * @return a new vulnerability object
      */
     public Vulnerability createVulnerability(Vulnerability vulnerability, boolean commitIndex) {
-        pm.currentTransaction().begin();
-        pm.makePersistent(vulnerability);
-        pm.currentTransaction().commit();
-        pm.getFetchPlan().setDetachmentOptions(FetchPlan.DETACH_LOAD_FIELDS);
-        final Vulnerability result = pm.getObjectById(Vulnerability.class, vulnerability.getId());
-        SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.CREATE, pm.detachCopy(result)));
+        final Vulnerability result = persist(vulnerability);
+        SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.CREATE, result));
         commitSearchIndex(commitIndex, Vulnerability.class);
         return result;
     }
@@ -508,30 +490,43 @@ public class QueryManager extends AlpineQueryManager {
      * @return a Vulnerability object
      */
     public Vulnerability updateVulnerability(Vulnerability transientVulnerability, boolean commitIndex) {
+        final Vulnerability vulnerability;
         if (transientVulnerability.getId() > 0) {
-            final Vulnerability vulnerability = getObjectById(Vulnerability.class, transientVulnerability.getId());
-            if (vulnerability != null) {
-                pm.currentTransaction().begin();
-                vulnerability.setDescription(transientVulnerability.getDescription());
-                vulnerability.setSource(transientVulnerability.getSource());
-                vulnerability.setCwe(transientVulnerability.getCwe());
-                vulnerability.setCvssV2BaseScore(transientVulnerability.getCvssV2BaseScore());
-                vulnerability.setCvssV2ImpactSubScore(transientVulnerability.getCvssV2ImpactSubScore());
-                vulnerability.setCvssV2ExploitabilitySubScore(transientVulnerability.getCvssV2ExploitabilitySubScore());
-                vulnerability.setCvssV2Vector(transientVulnerability.getCvssV2Vector());
-                vulnerability.setCvssV3BaseScore(transientVulnerability.getCvssV3BaseScore());
-                vulnerability.setCvssV3ImpactSubScore(transientVulnerability.getCvssV3ImpactSubScore());
-                vulnerability.setCvssV3ExploitabilitySubScore(transientVulnerability.getCvssV3ExploitabilitySubScore());
-                vulnerability.setCvssV3Vector(transientVulnerability.getCvssV3Vector());
-                vulnerability.setMatchedCPE(transientVulnerability.getMatchedCPE());
-                vulnerability.setMatchedAllPreviousCPE(transientVulnerability.getMatchedAllPreviousCPE());
-                pm.currentTransaction().commit();
-                pm.getFetchPlan().setDetachmentOptions(FetchPlan.DETACH_LOAD_FIELDS);
-                final Vulnerability result = pm.getObjectById(Vulnerability.class, vulnerability.getId());
-                SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.UPDATE, pm.detachCopy(result)));
-                commitSearchIndex(commitIndex, Vulnerability.class);
-                return result;
-            }
+            vulnerability = getObjectById(Vulnerability.class, transientVulnerability.getId());
+        } else {
+            vulnerability = getVulnerabilityByVulnId(transientVulnerability.getSource(), transientVulnerability.getVulnId());
+        }
+
+        if (vulnerability != null) {
+            vulnerability.setCreated(transientVulnerability.getCreated());
+            vulnerability.setPublished(transientVulnerability.getPublished());
+            vulnerability.setUpdated(transientVulnerability.getUpdated());
+            vulnerability.setVulnId(transientVulnerability.getVulnId());
+            vulnerability.setSource(transientVulnerability.getSource());
+            vulnerability.setCredits(transientVulnerability.getCredits());
+            vulnerability.setVulnerableVersions(transientVulnerability.getVulnerableVersions());
+            vulnerability.setPatchedVersions(transientVulnerability.getPatchedVersions());
+            vulnerability.setDescription(transientVulnerability.getDescription());
+            vulnerability.setTitle(transientVulnerability.getTitle());
+            vulnerability.setSubTitle(transientVulnerability.getSubTitle());
+            vulnerability.setReferences(transientVulnerability.getReferences());
+            vulnerability.setRecommendation(transientVulnerability.getRecommendation());
+            vulnerability.setCwe(transientVulnerability.getCwe());
+            vulnerability.setCvssV2Vector(transientVulnerability.getCvssV2Vector());
+            vulnerability.setCvssV2BaseScore(transientVulnerability.getCvssV2BaseScore());
+            vulnerability.setCvssV2ImpactSubScore(transientVulnerability.getCvssV2ImpactSubScore());
+            vulnerability.setCvssV2ExploitabilitySubScore(transientVulnerability.getCvssV2ExploitabilitySubScore());
+            vulnerability.setCvssV3Vector(transientVulnerability.getCvssV3Vector());
+            vulnerability.setCvssV3BaseScore(transientVulnerability.getCvssV3BaseScore());
+            vulnerability.setCvssV3ImpactSubScore(transientVulnerability.getCvssV3ImpactSubScore());
+            vulnerability.setCvssV3ExploitabilitySubScore(transientVulnerability.getCvssV3ExploitabilitySubScore());
+            vulnerability.setMatchedAllPreviousCPE(transientVulnerability.getMatchedAllPreviousCPE());
+            vulnerability.setMatchedCPE(transientVulnerability.getMatchedCPE());
+
+            final Vulnerability result = persist(vulnerability);
+            SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.UPDATE, result));
+            commitSearchIndex(commitIndex, Vulnerability.class);
+            return result;
         }
         return null;
     }
@@ -540,16 +535,16 @@ public class QueryManager extends AlpineQueryManager {
      * Synchronizes a vulnerability. Method first checkes to see if the vulnerability already
      * exists and if so, updates the vulnerability. If the vulnerability does not already exist,
      * this method will create a new vulnerability.
-     * @param transientVulnerability the vulnerability to synchronize
+     * @param vulnerability the vulnerability to synchronize
      * @param commitIndex specifies if the search index should be committed (an expensive operation)
      * @return a Vulnerability object
      */
-    public Vulnerability synchronizeVulnerability(Vulnerability transientVulnerability, boolean commitIndex) {
-        Vulnerability vulnerability = updateVulnerability(transientVulnerability, commitIndex);
-        if (vulnerability == null) {
-            vulnerability = createVulnerability(transientVulnerability, commitIndex);
+    public Vulnerability synchronizeVulnerability(Vulnerability vulnerability, boolean commitIndex) {
+        Vulnerability result = updateVulnerability(vulnerability, commitIndex);
+        if (result == null) {
+            result = createVulnerability(vulnerability, commitIndex);
         }
-        return vulnerability;
+        return result;
     }
 
     /**
@@ -733,6 +728,9 @@ public class QueryManager extends AlpineQueryManager {
     @SuppressWarnings("unchecked")
     public PaginatedResult getVulnerabilities() {
         final Query query = pm.newQuery(Vulnerability.class);
+        if (orderBy == null) {
+            query.setOrdering("vulnId descending, source ascending");
+        }
         if (filter != null) {
             query.setFilter("vulnId.toLowerCase().matches(:vulnId)");
             final String filterString = ".*" + filter.toLowerCase() + ".*";

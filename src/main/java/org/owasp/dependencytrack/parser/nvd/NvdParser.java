@@ -18,13 +18,12 @@ package org.owasp.dependencytrack.parser.nvd;
 
 import alpine.event.framework.SingleThreadedEventService;
 import alpine.logging.Logger;
+import org.apache.commons.lang.StringUtils;
 import org.owasp.dependencytrack.event.IndexEvent;
 import org.owasp.dependencytrack.model.Cwe;
 import org.owasp.dependencytrack.model.Vulnerability;
 import org.owasp.dependencytrack.persistence.QueryManager;
-import us.springett.cvss.CvssV2;
-import us.springett.cvss.CvssV3;
-import us.springett.cvss.Score;
+import us.springett.cvss.Cvss;
 import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonObject;
@@ -33,7 +32,9 @@ import javax.json.JsonString;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
-import java.math.BigDecimal;
+import java.sql.Date;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 
 public final class NvdParser {
 
@@ -60,13 +61,28 @@ public final class NvdParser {
                 final JsonObject cveItem = cveItems.getJsonObject(i);
 
                 // CVE ID
-                final JsonObject meta0 = cveItem.getJsonObject("CVE_data_meta");
-                final JsonString meta1 = meta0.getJsonString("CVE_ID");
+                final JsonObject cve = cveItem.getJsonObject("cve");
+                final JsonObject meta0 = cve.getJsonObject("CVE_data_meta");
+                final JsonString meta1 = meta0.getJsonString("ID");
                 vulnerability.setVulnId(meta1.getString());
 
+                // CVE Published and Modified dates
+                final String publishedDateString = cveItem.getString("publishedDate");
+                final String lastModifiedDateString = cveItem.getString("lastModifiedDate");
+                try {
+                    if (StringUtils.isNotBlank(publishedDateString)) {
+                        vulnerability.setPublished(Date.from(OffsetDateTime.parse(publishedDateString).toInstant()));
+                    }
+                    if (StringUtils.isNotBlank(lastModifiedDateString)) {
+                        vulnerability.setUpdated(Date.from(OffsetDateTime.parse(lastModifiedDateString).toInstant()));
+                    }
+                } catch (DateTimeParseException | NullPointerException | IllegalArgumentException e) {
+                    LOGGER.error("Unable to parse dates from NVD data feed", e);
+                }
+
                 // CVE Description
-                final JsonObject descO = cveItem.getJsonObject("CVE_description");
-                final JsonArray desc1 = descO.getJsonArray("CVE_description_data");
+                final JsonObject descO = cve.getJsonObject("description");
+                final JsonArray desc1 = descO.getJsonArray("description_data");
                 for (int j = 0; j < desc1.size(); j++) {
                     final JsonObject desc2 = desc1.getJsonObject(j);
                     if ("en".equals(desc2.getString("lang"))) {
@@ -78,8 +94,8 @@ public final class NvdParser {
                 parseCveImpact(cveItem, vulnerability);
 
                 // CWE
-                final JsonObject prob0 = cveItem.getJsonObject("CVE_problemtype");
-                final JsonArray prob1 = prob0.getJsonArray("CVE_problemtype_data");
+                final JsonObject prob0 = cve.getJsonObject("problemtype");
+                final JsonArray prob1 = prob0.getJsonArray("problemtype_data");
                 for (int j = 0; j < prob1.size(); j++) {
                     final JsonObject prob2 = prob1.getJsonObject(j);
                     final JsonArray prob3 = prob2.getJsonArray("description");
@@ -100,6 +116,27 @@ public final class NvdParser {
                         }
                     }
                 }
+
+                // References
+                final JsonObject ref0 = cve.getJsonObject("references");
+                final JsonArray ref1 = ref0.getJsonArray("reference_data");
+                final StringBuilder sb = new StringBuilder();
+                for (int l = 0; l < ref1.size(); l++) {
+                    final JsonObject ref2 = ref1.getJsonObject(l);
+                    for (String s : ref2.keySet()) {
+                        if ("url".equals(s)) {
+                            // Convert reference to Markdown format
+                            final String url = ref2.getString("url");
+                            sb.append("* [").append(url).append("](").append(url).append(")\n");
+                        }
+                    }
+                }
+                final String references = sb.toString();
+                if (references.length() > 0) {
+                    vulnerability.setReferences(references.substring(0, references.lastIndexOf("\n")));
+                }
+
+                // Update the vulnerability
                 qm.synchronizeVulnerability(vulnerability, false);
             }
         } catch (Exception e) {
@@ -109,92 +146,30 @@ public final class NvdParser {
         SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.COMMIT, Vulnerability.class));
     }
 
-    private void parseCveImpact(JsonObject cveItem, Vulnerability vulnerability) {
-        final JsonObject imp0 = cveItem.getJsonObject("CVE_impact");
-        final JsonObject imp1 = imp0.getJsonObject("CVE_impact_cvssv2");
+    private void parseCveImpact(JsonObject cveItem, Vulnerability vuln) {
+        final JsonObject imp0 = cveItem.getJsonObject("impact");
+        final JsonObject imp1 = imp0.getJsonObject("baseMetricV2");
         if (imp1 != null) {
-            final JsonObject imp2 = imp1.getJsonObject("bm");
+            final JsonObject imp2 = imp1.getJsonObject("cvssV2");
             if (imp2 != null) {
-                final String av = normalize(imp2.getJsonString("av"));
-                final String ac = normalize(imp2.getJsonString("ac"));
-                final String au = normalize(imp2.getJsonString("au"));
-                final String c = normalize(imp2.getJsonString("c"));
-                final String i = normalize(imp2.getJsonString("i"));
-                final String a = normalize(imp2.getJsonString("a"));
-                //final JsonString score = imp2.getJsonString("score");
-
-                if (av != null && ac != null && au != null && c != null && i != null && a != null) {
-                    final CvssV2 cvssV2 = new CvssV2()
-                            .attackVector(CvssV2.AttackVector.valueOf(av))
-                            .attackComplexity(CvssV2.AttackComplexity.valueOf(ac))
-                            .authentication(CvssV2.Authentication.valueOf(au))
-                            .confidentiality(CvssV2.CIA.valueOf(c))
-                            .integrity(CvssV2.CIA.valueOf(i))
-                            .availability(CvssV2.CIA.valueOf(a));
-
-                    final Score score = cvssV2.calculateScore();
-                    vulnerability.setCvssV2Vector(cvssV2.getVector());
-                    vulnerability.setCvssV2BaseScore(new BigDecimal(score.getBaseScore()));
-                    vulnerability.setCvssV2ExploitabilitySubScore(new BigDecimal(score.getExploitabilitySubScore()));
-                    vulnerability.setCvssV2ImpactSubScore(new BigDecimal(score.getImpactSubScore()));
-                }
+                final Cvss cvss = Cvss.fromVector(imp2.getJsonString("vectorString").getString());
+                vuln.setCvssV2Vector(cvss.getVector()); // normalize the vector but use the scores from the feed
+                vuln.setCvssV2BaseScore(imp2.getJsonNumber("baseScore").bigDecimalValue());
             }
+            vuln.setCvssV2ExploitabilitySubScore(imp1.getJsonNumber("exploitabilityScore").bigDecimalValue());
+            vuln.setCvssV2ImpactSubScore(imp1.getJsonNumber("impactScore").bigDecimalValue());
         }
-        final JsonObject imp3 = imp0.getJsonObject("CVE_impact_cvssv3");
+
+        final JsonObject imp3 = imp0.getJsonObject("baseMetricV3");
         if (imp3 != null) {
-            final JsonObject imp4 = imp3.getJsonObject("bm");
+            final JsonObject imp4 = imp3.getJsonObject("cvssV3");
             if (imp4 != null) {
-                final String av = normalize(imp4.getJsonString("av"));
-                final String ac = normalize(imp4.getJsonString("ac"));
-                final String pr = normalize(imp4.getJsonString("pr"));
-                final String ui = normalize(imp4.getJsonString("ui"));
-                final String s = normalize(imp4.getJsonString("scope"));
-                final String c = normalize(imp4.getJsonString("c"));
-                final String i = normalize(imp4.getJsonString("i"));
-                final String a = normalize(imp4.getJsonString("a"));
-                //final JsonString score = imp4.getJsonString("score");
-
-                if (av != null && ac != null && pr != null && ui != null && s != null && c != null && i != null && a != null) {
-                    final CvssV3 cvssV3 = new CvssV3()
-                            .attackVector(CvssV3.AttackVector.valueOf(av))
-                            .attackComplexity(CvssV3.AttackComplexity.valueOf(ac))
-                            .privilegesRequired(CvssV3.PrivilegesRequired.valueOf(pr))
-                            .userInteraction(CvssV3.UserInteraction.valueOf(ui))
-                            .scope(CvssV3.Scope.valueOf(s))
-                            .confidentiality(CvssV3.CIA.valueOf(c))
-                            .integrity(CvssV3.CIA.valueOf(i))
-                            .availability(CvssV3.CIA.valueOf(a));
-
-                    final Score score = cvssV3.calculateScore();
-                    vulnerability.setCvssV3Vector(cvssV3.getVector());
-                    vulnerability.setCvssV3BaseScore(new BigDecimal(score.getBaseScore()));
-                    vulnerability.setCvssV3ExploitabilitySubScore(new BigDecimal(score.getExploitabilitySubScore()));
-                    vulnerability.setCvssV3ImpactSubScore(new BigDecimal(score.getImpactSubScore()));
-                }
+                final Cvss cvss = Cvss.fromVector(imp4.getJsonString("vectorString").getString());
+                vuln.setCvssV3Vector(cvss.getVector()); // normalize the vector but use the scores from the feed
+                vuln.setCvssV3BaseScore(imp4.getJsonNumber("baseScore").bigDecimalValue());
             }
-        }
-    }
-
-    private String normalize(JsonString in) {
-        switch (in.getString()) {
-            case ("SINGLE")             : return "SINGLE";
-            case ("SINGLE_INSTANCE")    : return "SINGLE";
-            case ("MULTIPLE_INSTANCES") : return "MULTIPLE";
-            case ("NONE")               : return "NONE";
-            case ("LOW")                : return "LOW";
-            case ("MEDIUM")             : return "MEDIUM";
-            case ("HIGH")               : return "HIGH";
-            case ("PARTIAL")            : return "PARTIAL";
-            case ("COMPLETE")           : return "COMPLETE";
-            case ("LOCAL")              : return "LOCAL";
-            case ("ADJACENT")           : return "ADJACENT";
-            case ("LOCAL_NETWORK")      : return "ADJACENT";
-            case ("NETWORK")            : return "NETWORK";
-            case ("PHYSICAL")           : return "PHYSICAL";
-            case ("REQUIRED")           : return "REQUIRED";
-            case ("UNCHANGED")          : return "UNCHANGED";
-            case ("CHANGED")            : return "CHANGED";
-            default                     : return null;
+            vuln.setCvssV3ExploitabilitySubScore(imp3.getJsonNumber("exploitabilityScore").bigDecimalValue());
+            vuln.setCvssV3ImpactSubScore(imp3.getJsonNumber("impactScore").bigDecimalValue());
         }
     }
 

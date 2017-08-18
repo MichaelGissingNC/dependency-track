@@ -1,4 +1,4 @@
-<%@page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@taglib prefix="e" uri="https://www.owasp.org/index.php/OWASP_Java_Encoder_Project" %>
 <!DOCTYPE html>
@@ -7,11 +7,11 @@
     <jsp:include page="/WEB-INF/fragments/header.jsp"/>
     <title>OWASP Dependency-Track - Administration</title>
 </head>
-<body>
+<body data-sidebar="admin">
 <jsp:include page="/WEB-INF/fragments/navbar.jsp"/>
 <div class="container-fluid">
-    <div class="content-row">
-        <div class="col-sm-12 col-md-12 main" id="main">
+    <div class="content-row main">
+        <div class="col-sm-12 col-md-12">
             <h3>Administration</h3>
             <div class="panel with-nav-tabs panel-default tight">
                 <div class="panel-heading">

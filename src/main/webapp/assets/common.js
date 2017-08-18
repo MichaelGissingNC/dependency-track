@@ -110,20 +110,22 @@ function logout() {
  */
 $("#login-form").submit(function(event) {
     event.preventDefault();
-    let username = $("#username").val();
-    let password = $("#password").val();
+    let usernameElement = $("#username");
+    let username = usernameElement.val();
+    let passwordElement = $("#password");
+    let password = passwordElement.val();
     $rest.login(username, password, function(data) {
         $.sessionStorage.set("token", data);
         $("#navbar-container").css("display", "block");
         $("#sidebar").css("display", "block");
-        $("#main").css("display", "block");
+        $(".main").css("display", "block");
         $("#modal-login").modal("hide");
         initialize();
     }, function(data) {
         // todo: Display invalid username or password somewhere
     });
-    username.val("");
-    password.val("");
+    usernameElement.val("");
+    passwordElement.val("");
 });
 
 /**
@@ -140,16 +142,16 @@ $(document).ready(function () {
 
     /**
      * Function that adds the 'active' class to one of the buttons in
-     * the sidebar based in the current url and the href of each button.
+     * the sidebar based on the data-sidebar attribute in the pages' body.
      */
     (function() {
         let nav = document.getElementById("sidebar"),
-            anchor = nav.getElementsByTagName("a"),
-            current = window.location.pathname;
-        for (let i = 0; i < anchor.length; i++) {
-            let pathname = $common.getLocation(anchor[i].href).pathname;
-            if(pathname === current) {
-                anchor[i].parentElement.className = "active";
+            anchors = nav.getElementsByTagName("a"),
+            bodySidebar = document.body.getAttribute("data-sidebar");
+
+        for (let i = 0; i < anchors.length; i++) {
+            if(bodySidebar === anchors[i].getAttribute("data-sidebar")) {
+                anchors[i].parentElement.className = "active";
             }
         }
     })();
@@ -162,7 +164,7 @@ $(document).ready(function () {
             templates: {
                 header: '<h4 class="section-title">Projects</h4>',
                 suggestion: function (data) {
-                    return '<a class="tt-suggestion-item" href="' + contextPath + '/project/?uuid=' + data.uuid + '">' + data.name + '</a>';
+                    return '<a class="tt-suggestion-item" href="' + contextPath + 'project/?uuid=' + data.uuid + '">' + data.name + '</a>';
                 }
             }
         },
@@ -173,7 +175,7 @@ $(document).ready(function () {
             templates: {
                 header: '<h4 class="section-title">Components</h4>',
                 suggestion: function (data) {
-                    return '<a class="tt-suggestion-item" href="' + contextPath + '/component/?uuid=' + data.uuid + '">' + data.name + '</a>';
+                    return '<a class="tt-suggestion-item" href="' + contextPath + 'component/?uuid=' + data.uuid + '">' + data.name + '</a>';
                 }
             }
         },
@@ -184,7 +186,7 @@ $(document).ready(function () {
             templates: {
                 header: '<h4 class="section-title">Vulnerabilities</h4>',
                 suggestion: function (data) {
-                    return '<a class="tt-suggestion-item" href="' + contextPath + '/vulnerability/?source=' + data.source + '&vulnId=' + data.vulnId + '">' + data.vulnId + '</a>';
+                    return '<a class="tt-suggestion-item" href="' + contextPath + 'vulnerability/?source=' + data.source + '&vulnId=' + data.vulnId + '">' + data.vulnId + '</a>';
                 }
             }
         },
@@ -195,7 +197,7 @@ $(document).ready(function () {
             templates: {
                 header: '<h4 class="section-title">Licenses</h4>',
                 suggestion: function (data) {
-                    return '<a class="tt-suggestion-item" href="' + contextPath + '/license/?licenseId=' + data.licenseId + '">' + data.name + '</a>';
+                    return '<a class="tt-suggestion-item" href="' + contextPath + 'license/?licenseId=' + data.licenseId + '">' + data.name + '</a>';
                 }
             }
         }

@@ -14,16 +14,10 @@
  * You should have received a copy of the GNU General Public License along with
  * Dependency-Track. If not, see http://www.gnu.org/licenses/.
  */
-package org.owasp.dependencytrack.search;
+package org.owasp.dependencytrack.event;
 
-public interface ObjectIndexer<T> {
+import alpine.event.framework.Event;
 
-    String[] getSearchFields();
-
-    void add(T object);
-
-    void remove(T object);
-
-    void commit();
+public class NspMirrorEvent implements Event {
 
 }
