@@ -75,13 +75,13 @@ public class DefaultObjectGenerator implements ServletContextListener {
                 final List<License> licenses = parser.getLicenseDefinitions();
                 for (License license : licenses) {
                     LOGGER.info("Added: " + license.getName());
-                    qm.createLicense(license, true);
+                    qm.createLicense(license, false);
                 }
             } catch (IOException | URISyntaxException e) {
                 LOGGER.error("An error occurred during the parsing SPDX license definitions.");
                 LOGGER.error(e.getMessage());
             }
-            qm.commitSearchIndex(true, License.class);
+            qm.commitSearchIndex(License.class);
         }
     }
 

@@ -21,6 +21,7 @@
  * Called by bootstrap table to format the data in the components table.
  */
 function formatComponentsTable(res) {
+    let componentsTable = $("#componentsTable");
     for (let i=0; i<res.length; i++) {
         let componenturl = "../component/?uuid=" + res[i].component.uuid;
         res[i].componenthref = "<a href=\"" + componenturl + "\">" + res[i].component.name + "</a>";
@@ -29,6 +30,14 @@ function formatComponentsTable(res) {
             let licenseurl = "../license/?licenseId=" + res[i].component.resolvedLicense.licenseId;
             res[i].component.license = "<a href=\"" + licenseurl + "\">" + res[i].component.resolvedLicense.licenseId + "</a>";
         }
+
+        $rest.getComponentCurrentMetrics(res[i].component.uuid, function (data) {
+            res[i].component.vulnerabilities = generateSeverityProgressBar(data.critical, data.high, data.medium, data.low);
+            componentsTable.bootstrapTable('updateRow', {
+                index: i,
+                row: res[i].component
+            });
+        });
     }
     return res;
 }
@@ -81,18 +90,23 @@ function populateLicenseData(data) {
     select.selectpicker('refresh');
 }
 
+function populateMetrics(data) {
+    $("#metricCritical").html(data.critical);
+    $("#metricHigh").html(data.high);
+    $("#metricMedium").html(data.medium);
+    $("#metricLow").html(data.low);
+    $("#metricIrs").html(data.inheritedRiskScore);
+}
+
 /**
  * Setup events and trigger other stuff when the page is loaded and ready
  */
 $(document).ready(function () {
-
     let uuid = $.getUrlVar('uuid');
 
     $rest.getProject(uuid, populateProjectData);
     $rest.getLicenses(populateLicenseData);
-
-    // Initialize all tooltips
-    //$('[data-toggle="tooltip"]').tooltip();
+    $rest.getProjectCurrentMetrics(uuid, populateMetrics);
 
     // Listen for when the button to create a project is clicked
     $("#createComponentCreateButton").on("click", function () {

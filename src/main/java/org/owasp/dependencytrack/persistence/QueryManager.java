@@ -575,6 +575,57 @@ public class QueryManager extends AlpineQueryManager {
     }
 
     /**
+     * Adds a vulnerability to a component
+     * @param vulnerability the vulnerabillity to add
+     * @param component the component affected by the vulnerabiity
+     */
+    @SuppressWarnings("unchecked")
+    public void addVulnerability(Vulnerability vulnerability, Component component) {
+        vulnerability = getObjectById(Vulnerability.class, vulnerability.getId());
+        component = getObjectById(Component.class, component.getId());
+        if (!contains(vulnerability, component)) {
+            pm.currentTransaction().begin();
+            component.addVulnerability(vulnerability);
+            pm.currentTransaction().commit();
+        }
+    }
+
+    /**
+     * Removes a vulnerability from a component
+     * @param vulnerability the vulnerabillity to remove
+     * @param component the component unaffected by the vulnerabiity
+     */
+    @SuppressWarnings("unchecked")
+    public void removeVulnerability(Vulnerability vulnerability, Component component) {
+        vulnerability = getObjectById(Vulnerability.class, vulnerability.getId());
+        component = getObjectById(Component.class, component.getId());
+        if (contains(vulnerability, component)) {
+            pm.currentTransaction().begin();
+            component.removeVulnerability(vulnerability);
+            pm.currentTransaction().commit();
+        }
+    }
+
+    /**
+     * Determines if a Component is affected by a specific Vulnerability by checking
+     * {@link Vulnerability#getSource()} and {@link Vulnerability#getVulnId()}.
+     * @param vulnerability The vulnerability to check if associated with component
+     * @param component The component to check against
+     * @return true if vulnerability is associated with the component, false if not
+     */
+    public boolean contains(Vulnerability vulnerability, Component component) {
+        vulnerability = getObjectById(Vulnerability.class, vulnerability.getId());
+        component = getObjectById(Component.class, component.getId());
+        for (Vulnerability vuln: component.getVulnerabilities()) {
+            if (vuln.getSource() != null && vuln.getSource().equals(vulnerability.getSource())
+                    && vuln.getVulnId() != null && vuln.getVulnId().equals(vulnerability.getVulnId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Checks if the specified CWE id exists or not. If not, creates
      * a new CWE with the specified ID and name. In both cases, the
      * CWE will be returned.
@@ -660,6 +711,12 @@ public class QueryManager extends AlpineQueryManager {
     public PaginatedResult getDependencies(Project project) {
         final Query query = pm.newQuery(Dependency.class, "project == :project");
         query.getFetchPlan().addGroup(Dependency.FetchGroup.COMPONENT_ONLY.name());
+        query.setOrdering("component.name asc");
+        if (filter != null) {
+            query.setFilter("component.name.toLowerCase().matches(:name)");
+            final String filterString = ".*" + filter.toLowerCase() + ".*";
+            return execute(query, filterString);
+        }
         return execute(query, project);
     }
 
@@ -909,5 +966,13 @@ public class QueryManager extends AlpineQueryManager {
         if (commitIndex) {
             SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.COMMIT, clazz));
         }
+    }
+
+    /**
+     * Commits the Lucene inxex.
+     * @param clazz the indexable class to commit the index of
+     */
+    public void commitSearchIndex(Class clazz) {
+        commitSearchIndex(true, clazz);
     }
 }

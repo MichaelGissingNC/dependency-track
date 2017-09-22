@@ -18,6 +18,7 @@ package org.owasp.dependencytrack.tasks;
 
 import alpine.event.LdapSyncEvent;
 import alpine.tasks.AlpineTaskScheduler;
+import org.owasp.dependencytrack.event.DependencyCheckEvent;
 import org.owasp.dependencytrack.event.NistMirrorEvent;
 import org.owasp.dependencytrack.event.MetricsUpdateEvent;
 import org.owasp.dependencytrack.event.NspMirrorEvent;
@@ -40,6 +41,12 @@ public final class TaskScheduler extends AlpineTaskScheduler {
 
         // Creates a new event that executes every 1 hour (3600000) after an initial 10 second (10000) delay
         scheduleEvent(new MetricsUpdateEvent(), 10000, 3600000);
+
+        // Creates a new event that executes every 6 hours (21600000) after an initial 1 minute (60000) delay
+        scheduleEvent(new DependencyCheckEvent(DependencyCheckEvent.Action.ANALYZE), 60000, 21600000);
+
+        // Creates a new event that executes every 6 hours (21600000) after an initial 10 second (10000) delay
+        scheduleEvent(new DependencyCheckEvent(DependencyCheckEvent.Action.UPDATE_ONLY), 10000, 21600000);
     }
 
     /**
