@@ -34,9 +34,9 @@
     <name>Dependency-Track</name>
     <url>https://www.owasp.org/index.php/OWASP_Dependency_Track</url>
     <description>
-        OWASP Dependency-Track is a web application that allows organizations to document the
-        use of third-party components across multiple applications and versions. Further, it
-        provides automatic visibility into the use of components with known vulnerabilities.
+        OWASP Dependency-Track is an intelligent Software Composition Analysis (SCA) application
+        that allows organizations to automatically ingest and identify third-party components and
+        any inherited vulnerabilities from their use.
     </description>
     <inceptionYear>2013</inceptionYear>
     <organization>
@@ -70,6 +70,7 @@
         <lib.dependency-check.version>2.1.2-SNAPSHOT</lib.dependency-check.version>
         <lib.unirest.version>1.4.9</lib.unirest.version>
         <lib.scribejava.version>4.2.0</lib.scribejava.version>
+        <lib.signpost-core.version>1.2.1.2</lib.signpost-core.version>
         <!-- build properties -->
         <plugin.retirejs.breakOnFailure>false</plugin.retirejs.breakOnFailure>
     </properties>
@@ -178,6 +179,12 @@
             <version>6.0.26</version>
         </dependency>
         -->
+        <!-- OAuth 1.0a Signing Request -->
+        <dependency>
+            <groupId>oauth.signpost</groupId>
+            <artifactId>signpost-core</artifactId>
+            <version>${lib.signpost-core.version}</version>
+        </dependency>
     </dependencies>
 
     <build>

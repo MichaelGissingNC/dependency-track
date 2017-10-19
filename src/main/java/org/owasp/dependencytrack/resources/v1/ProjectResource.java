@@ -42,6 +42,12 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+/**
+ * JAX-RS resources for processing projects.
+ *
+ * @author Steve Springett
+ * @since 3.0.0
+ */
 @Path("/v1/project")
 @Api(value = "project", authorizations = @Authorization(value = "X-Api-Key"))
 public class ProjectResource extends AlpineResource {
@@ -160,9 +166,13 @@ public class ProjectResource extends AlpineResource {
             if (project != null) {
                 final Project tmpProject = qm.getProject(jsonProject.getName().trim());
                 if (tmpProject == null || (tmpProject.getUuid().equals(project.getUuid()))) {
-                    project.setName(jsonProject.getName().trim());
-                    project.setDescription(jsonProject.getDescription());
-                    project = qm.updateProject(jsonProject, true);
+                    project = qm.updateProject(
+                            jsonProject.getUuid(),
+                            jsonProject.getName().trim(),
+                            StringUtils.trimToNull(jsonProject.getDescription()),
+                            StringUtils.trimToNull(jsonProject.getVersion()),
+                            jsonProject.getTags(),
+                            true);
                     return Response.ok(project).build();
                 } else {
                     return Response.status(Response.Status.CONFLICT).entity("A project with the specified name already exists.").build();

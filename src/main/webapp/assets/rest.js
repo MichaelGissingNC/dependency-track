@@ -313,10 +313,9 @@ $rest.updateProject = function updateProject(uuid, name, version, description, t
  */
 $rest.deleteProject = function deleteProject(uuid, successCallback, failCallback) {
     $.ajax({
-        url: $rest.contextPath() + URL_PROJECT,
+        url: $rest.contextPath() + URL_PROJECT + "/" + uuid,
         contentType: CONTENT_TYPE_JSON,
         type: METHOD_DELETE,
-        data: JSON.stringify({uuid: uuid}),
         statusCode: {
             204: function(data) {
                 if (successCallback) {
@@ -351,6 +350,64 @@ $rest.createComponent = function createComponent(name, version, group, descripti
             201: function(data) {
                 if (successCallback) {
                     $rest.callbackValidator(successCallback(data));
+                }
+            }
+        },
+        error: function(xhr, ajaxOptions, thrownError) {
+            if (failCallback) {
+                $rest.callbackValidator(failCallback(xhr, ajaxOptions, thrownError));
+            }
+        }
+    });
+};
+
+/**
+ * Service called when a component is updated.
+ */
+$rest.updateComponent = function updateComponent(uuid, name, version, group, description, license, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_COMPONENT,
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_POST,
+        data: JSON.stringify({uuid: uuid, name: name, version: version, group: group, description: description, license: license}),
+        statusCode: {
+            200: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            404: function(data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
+                }
+            }
+        },
+        error: function(xhr, ajaxOptions, thrownError) {
+            if (failCallback) {
+                $rest.callbackValidator(failCallback(xhr, ajaxOptions, thrownError));
+            }
+        }
+    });
+};
+
+/**
+ * Service called when a component is deleted.
+ */
+$rest.deleteComponent = function deleteProject(uuid, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_COMPONENT + "/" + uuid,
+        contentType: CONTENT_TYPE_JSON,
+        type: METHOD_DELETE,
+        statusCode: {
+            204: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            404: function(data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
                 }
             }
         },
@@ -420,7 +477,7 @@ $rest.getComponent = function getProject(uuid, successCallback, failCallback) {
  */
 $rest.getLicenses = function getLicenses(successCallback, failCallback) {
     $.ajax({
-        url: $rest.contextPath() + URL_LICENSE,
+        url: $rest.contextPath() + URL_LICENSE + "?offset=0&limit=1000",
         contentType: CONTENT_TYPE_JSON,
         dataType: DATA_TYPE,
         type: METHOD_GET,
@@ -468,7 +525,7 @@ $rest.getLicense = function getLicense(licenseId, successCallback, failCallback)
  */
 $rest.getVulnerabilityByUuid = function getVulnerabilityByUuid(uuid, successCallback, failCallback) {
     $.ajax({
-        url: $rest.contextPath() + URL_VULNERABILITY + "/uuid/" + uuid,
+        url: $rest.contextPath() + URL_VULNERABILITY + "/" + uuid,
         contentType: CONTENT_TYPE_JSON,
         dataType: DATA_TYPE,
         type: METHOD_GET,
@@ -594,6 +651,384 @@ $rest.getComponentCurrentMetrics = function getComponentCurrentMetrics(uuid, suc
 };
 
 /**
+ * Service called when a team is created.
+ */
+$rest.createTeam = function createTeam(name, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_TEAM,
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_PUT,
+        data: JSON.stringify({name: name}),
+        statusCode: {
+            201: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            }
+        },
+        error: function(xhr, ajaxOptions, thrownError) {
+            if (failCallback) {
+                $rest.callbackValidator(failCallback(xhr, ajaxOptions, thrownError));
+            }
+        }
+    });
+};
+
+/**
+ * Service called when a team is updated.
+ */
+$rest.updateTeam = function updateTeam(uuid, name, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_TEAM,
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_POST,
+        data: JSON.stringify({uuid: uuid, name: name}),
+        statusCode: {
+            200: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            404: function(data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
+                }
+            }
+        },
+        error: function(xhr, ajaxOptions, thrownError) {
+            if (failCallback) {
+                $rest.callbackValidator(failCallback(xhr, ajaxOptions, thrownError));
+            }
+        }
+    });
+};
+
+/**
+ * Service called when a team is deleted.
+ */
+$rest.deleteTeam = function deleteTeam(uuid, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_TEAM,
+        contentType: CONTENT_TYPE_JSON,
+        type: METHOD_DELETE,
+        data: JSON.stringify({uuid: uuid}),
+        statusCode: {
+            204: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            404: function(data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
+                }
+            }
+        },
+        error: function(xhr, ajaxOptions, thrownError) {
+            if (failCallback) {
+                $rest.callbackValidator(failCallback(xhr, ajaxOptions, thrownError));
+            }
+        }
+    });
+};
+
+/**
+ * Service called when a managed user is created.
+ */
+$rest.createManagedUser = function createManagedUser(username, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_USER_MANAGED,
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_PUT,
+        data: JSON.stringify({username: username}),
+        statusCode: {
+            201: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            }
+        },
+        error: function(xhr, ajaxOptions, thrownError) {
+            if (failCallback) {
+                $rest.callbackValidator(failCallback(xhr, ajaxOptions, thrownError));
+            }
+        }
+    });
+};
+
+/**
+ * Service called when a managed user is updated.
+ * //todo: complete this service on client and server side
+ */
+$rest.updateManagedUser = function updateManagedUser(username, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_USER_MANAGED,
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_POST,
+        data: JSON.stringify({username: username}),
+        statusCode: {
+            200: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            404: function(data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
+                }
+            }
+        },
+        error: function(xhr, ajaxOptions, thrownError) {
+            if (failCallback) {
+                $rest.callbackValidator(failCallback(xhr, ajaxOptions, thrownError));
+            }
+        }
+    });
+};
+
+/**
+ * Service called when a managed user is deleted.
+ */
+$rest.deleteManagedUser = function deleteManagedUser(username, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_USER_MANAGED,
+        contentType: CONTENT_TYPE_JSON,
+        type: METHOD_DELETE,
+        data: JSON.stringify({username: username}),
+        statusCode: {
+            204: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            404: function(data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
+                }
+            }
+        },
+        error: function(xhr, ajaxOptions, thrownError) {
+            if (failCallback) {
+                $rest.callbackValidator(failCallback(xhr, ajaxOptions, thrownError));
+            }
+        }
+    });
+};
+
+/**
+ * Service called when a LDAP user is created.
+ */
+$rest.createLdapUser = function createLdapUser(username, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_USER_LDAP,
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_PUT,
+        data: JSON.stringify({username: username}),
+        statusCode: {
+            201: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            }
+        },
+        error: function(xhr, ajaxOptions, thrownError) {
+            if (failCallback) {
+                $rest.callbackValidator(failCallback(xhr, ajaxOptions, thrownError));
+            }
+        }
+    });
+};
+
+/**
+ * Service called when a LDAP user is deleted.
+ */
+$rest.deleteLdapUser = function deleteLdapUser(username, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_USER_LDAP,
+        contentType: CONTENT_TYPE_JSON,
+        type: METHOD_DELETE,
+        data: JSON.stringify({username: username}),
+        statusCode: {
+            204: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            404: function(data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
+                }
+            }
+        },
+        error: function(xhr, ajaxOptions, thrownError) {
+            if (failCallback) {
+                $rest.callbackValidator(failCallback(xhr, ajaxOptions, thrownError));
+            }
+        }
+    });
+};
+
+/**
+ * Service called when an API key is created.
+ */
+$rest.addApiKey = function addApiKey(uuid, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_TEAM + "/" + uuid + "/key",
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_PUT,
+        statusCode: {
+            201: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            404: function(data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
+                }
+            }
+        },
+        error: function(xhr, ajaxOptions, thrownError){
+            if (failCallback) {
+                $rest.callbackValidator(failCallback(xhr, ajaxOptions, thrownError));
+            }
+        }
+    });
+};
+
+/**
+ * Service called when an API key is regenerated.
+ */
+$rest.regenerateApiKey = function regenerateApiKey(apikey, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_TEAM + "/key/" + apikey,
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_POST,
+        statusCode: {
+            200: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            404: function(data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
+                }
+            }
+        },
+        error: function(xhr, ajaxOptions, thrownError){
+            if (failCallback) {
+                $rest.callbackValidator(failCallback(xhr, ajaxOptions, thrownError));
+            }
+        }
+    });
+};
+
+/**
+ * Service called when an API key is deleted.
+ */
+$rest.deleteApiKey = function deleteApiKey(apikey, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_TEAM + "/key/" + apikey,
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_DELETE,
+        statusCode: {
+            204: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            404: function(data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
+                }
+            }
+        },
+        error: function(xhr, ajaxOptions, thrownError){
+            if (failCallback) {
+                $rest.callbackValidator(failCallback(xhr, ajaxOptions, thrownError));
+            }
+        }
+    });
+};
+
+/**
+ * Service called when a user is assigned to a team.
+ */
+$rest.assignUserToTeam = function assignUserToTeam(username, teamuuid, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_USER + "/" + username + "/membership",
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_POST,
+        data: JSON.stringify({uuid: teamuuid}),
+        statusCode: {
+            200: function (data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            304: function (data) {
+                // The user is already a member of the specified team
+                // Intentionally left blank
+            },
+            404: function (data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
+                }
+            }
+        },
+        error: function(xhr, ajaxOptions, thrownError){
+            if (failCallback) {
+                $rest.callbackValidator(failCallback(xhr, ajaxOptions, thrownError));
+            }
+        }
+    });
+};
+
+/**
+ * Service called when a user is un-assigned from a team.
+ */
+$rest.removeUserFromTeam = function removeUserFromTeam(username, teamuuid, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_USER + "/" + username + "/membership",
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_DELETE,
+        data: JSON.stringify({uuid: teamuuid}),
+        statusCode: {
+            200: function (data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            304: function (data) {
+                // The user was not a member of the specified team
+                // Intentionally left blank
+            },
+            404: function (data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
+                }
+            }
+        },
+        error: function(xhr, ajaxOptions, thrownError){
+            if (failCallback) {
+                $rest.callbackValidator(failCallback(xhr, ajaxOptions, thrownError));
+            }
+        }
+    });
+};
+
+/**
  * Generic handler for all AJAX requests
  */
 $.ajaxSetup({
@@ -610,12 +1045,27 @@ $.ajaxSetup({
             $(".main").css("display", "block");
             $("#modal-login").modal("hide");
         },
+        400: function(xhr) {
+            displayErrorModal(xhr, "The request made was incorrect or not in the proper format (400).");
+        },
         401: function() {
             $("#navbar-container").css("display", "none");
             $("#sidebar").css("display", "none");
             $(".main").css("display", "none");
             $("#modal-login").modal("show");
             $("#username").focus();
+        },
+        403: function(xhr) {
+            displayErrorModal(xhr, "The request is forbidden (403).");
+        },
+        404: function(xhr) {
+            displayErrorModal(xhr, "The requested object could not be found (404).");
+        },
+        409: function(xhr) {
+            displayErrorModal(xhr, "A conflict occurred preventing the request from being processed (409).");
+        },
+        500: function() {
+            displayErrorModal(null, "An unexpected error occurred. Please contact the Dependency-Track administrator for assistance (500).");
         }
     }
 });

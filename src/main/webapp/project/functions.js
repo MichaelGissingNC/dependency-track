@@ -24,11 +24,13 @@ function formatComponentsTable(res) {
     let componentsTable = $("#componentsTable");
     for (let i=0; i<res.length; i++) {
         let componenturl = "../component/?uuid=" + res[i].component.uuid;
-        res[i].componenthref = "<a href=\"" + componenturl + "\">" + res[i].component.name + "</a>";
+        res[i].componenthref = "<a href=\"" + componenturl + "\">" + filterXSS(res[i].component.name)+ "</a>";
+        res[i].component.version = filterXSS(res[i].component.version);
+        res[i].component.group = filterXSS(res[i].component.group);
 
         if (res[i].component.hasOwnProperty("resolvedLicense")) {
             let licenseurl = "../license/?licenseId=" + res[i].component.resolvedLicense.licenseId;
-            res[i].component.license = "<a href=\"" + licenseurl + "\">" + res[i].component.resolvedLicense.licenseId + "</a>";
+            res[i].component.license = "<a href=\"" + licenseurl + "\">" + filterXSS(res[i].component.resolvedLicense.licenseId) + "</a>";
         }
 
         $rest.getComponentCurrentMetrics(res[i].component.uuid, function (data) {
@@ -76,9 +78,27 @@ function clearInputFields() {
 }
 
 function populateProjectData(data) {
-    $("#projectTitle").html(data.name);
+    let escapedProjectName = filterXSS(data.name);
+    let escapedProjectVersion = filterXSS(data.version);
+    let escapedProjectDescription = filterXSS(data.description);
+
+    $("#projectNameInput").val(data.name);
+    $("#projectVersionInput").val(data.version);
+    $("#projectDescriptionInput").val(data.description);
+
+    $("#projectTitle").html(escapedProjectName);
     if (data.version) {
-        $("#projectVersion").html(" &#x025B8; " + data.version);
+        $("#projectVersion").html(" &#x025B8; " + escapedProjectVersion);
+    }
+    if (data.tags) {
+        let html = "";
+        let tagsInput = $("#projectTagsInput");
+        for (let i=0; i<data.tags.length; i++) {
+            let tag = data.tags[i].name;
+            html += `<a href="../projects/?tag=${encodeURIComponent(tag)}"><span class="badge tag-standalone">${filterXSS(tag)}</span></a>`;
+            tagsInput.tagsinput('add', tag);
+        }
+        $("#tags").html(html);
     }
 }
 
@@ -91,11 +111,11 @@ function populateLicenseData(data) {
 }
 
 function populateMetrics(data) {
-    $("#metricCritical").html(data.critical);
-    $("#metricHigh").html(data.high);
-    $("#metricMedium").html(data.medium);
-    $("#metricLow").html(data.low);
-    $("#metricIrs").html(data.inheritedRiskScore);
+    $("#metricCritical").html(filterXSS(data.critical));
+    $("#metricHigh").html(filterXSS(data.high));
+    $("#metricMedium").html(filterXSS(data.medium));
+    $("#metricLow").html(filterXSS(data.low));
+    $("#metricIrs").html(filterXSS(data.inheritedRiskScore));
 }
 
 /**
@@ -121,6 +141,22 @@ $(document).ready(function () {
     // When modal closes, clear out the input fields
     $("#modalCreateComponent").on("hidden.bs.modal", function () {
         $("#createComponentNameInput").val("");
+    });
+
+    $("#updateProjectButton").on("click", function () {
+        let name = $("#projectNameInput").val();
+        let version = $("#projectVersionInput").val();
+        let description = $("#projectDescriptionInput").val();
+        let tags = csvStringToObjectArray($("#projectTagsInput").val());
+        $rest.updateProject(uuid, name, version, description, tags, function() {
+            $rest.getProject(uuid, populateProjectData);
+        });
+    });
+
+    $("#deleteProjectButton").on("click", function () {
+        $rest.deleteProject(uuid, function() {
+            window.location.href = "../projects";
+        });
     });
 
 });

@@ -25,7 +25,7 @@
                                     <span id="projectVersion"></span>
                                 </span>
                                 <br/>Sub Project: 0<br/>
-                                <a href="#"><span class="badge tag-standalone">rest</span></a><a href="#"><span class="badge tag-standalone">api</span></a><a href="#"><span class="badge tag-standalone">java</span></a><a href="#"><span class="badge tag-standalone">javascript</span></a>
+                                <span id="tags"></span>
                             </div>
                         </div>
                         <div class="col-sm-3 col-md-3 col-lg-2">
@@ -65,7 +65,7 @@
 
                     </div>
                 </div>
-                <a href="#">
+                <a href="#" class="widget-details-selector" data-toggle="modal" data-target="#modalDetails">
                     <div class="panel-footer">
                         <span class="pull-left">View Details</span>
                         <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
@@ -122,7 +122,7 @@
                         <input type="text" name="group" required="false" placeholder="Group..." class="form-control" id="createComponentGroupInput">
                     </div>
                     <div class="form-group">
-                        <label class="sr-only" for="createComponentDescriptionInput">Group</label>
+                        <label class="sr-only" for="createComponentDescriptionInput">Description</label>
                         <textarea name="description" required="false" placeholder="Description..." class="form-control" id="createComponentDescriptionInput"></textarea>
                     </div>
                     <div class="form-group">
@@ -135,6 +135,40 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" data-dismiss="modal" id="createComponentCreateButton">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalDetails" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-md" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title">Project Details</h4>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="sr-only" for="projectNameInput">Project Name</label>
+                        <input type="text" name="name" required="true" placeholder="Name..." class="form-control" id="projectNameInput">
+                    </div>
+                    <div class="form-group">
+                        <label class="sr-only" for="projectVersionInput">Version</label>
+                        <input type="text" name="version" required="false" placeholder="Version..." class="form-control" id="projectVersionInput">
+                    </div>
+                    <div class="form-group">
+                        <label class="sr-only" for="projectDescriptionInput">Description</label>
+                        <textarea name="description" required="false" placeholder="Description..." class="form-control" id="projectDescriptionInput"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="sr-only" for="projectTagsInput">Tags</label>
+                        <input type="text" name="tags" placeholder="Tags, comma separated" class="form-control" data-role="tagsinput" id="projectTagsInput">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-danger" data-dismiss="modal" id="deleteProjectButton">Delete</button>
+                    <button type="button" class="btn btn-primary" data-dismiss="modal" id="updateProjectButton">Update</button>
+                    <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>

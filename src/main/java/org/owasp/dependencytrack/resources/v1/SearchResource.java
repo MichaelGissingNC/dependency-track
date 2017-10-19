@@ -33,6 +33,12 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+/**
+ * JAX-RS resources for processing search requests.
+ *
+ * @author Steve Springett
+ * @since 3.0.0
+ */
 @Path("/v1/search")
 @Api(value = "search", authorizations = @Authorization(value = "X-Api-Key"))
 public class SearchResource extends AlpineResource {
@@ -48,7 +54,7 @@ public class SearchResource extends AlpineResource {
             @ApiResponse(code = 401, message = "Unauthorized")
     })
     @PermissionRequired(Permission.PROJECT_VIEW)
-    public Response getProjects(@PathParam("query") String query) {
+    public Response search(@PathParam("query") String query) {
         final SearchManager searchManager = new SearchManager();
         final SearchResult searchResult = searchManager.searchIndices(query, 10);
         return Response.ok(searchResult).build();

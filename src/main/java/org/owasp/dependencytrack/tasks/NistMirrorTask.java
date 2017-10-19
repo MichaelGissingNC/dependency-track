@@ -18,7 +18,7 @@ package org.owasp.dependencytrack.tasks;
 
 import alpine.Config;
 import alpine.event.framework.Event;
-import alpine.event.framework.Subscriber;
+import alpine.event.framework.LoggableSubscriber;
 import alpine.logging.Logger;
 import org.apache.commons.lang3.StringUtils;
 import org.owasp.dependencytrack.event.NistMirrorEvent;
@@ -39,7 +39,13 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.zip.GZIPInputStream;
 
-public class NistMirrorTask implements Subscriber {
+/**
+ * Subscriber task that performs a mirror of the National Vulnerability Database.
+ *
+ * @author Steve Springett
+ * @since 3.0.0
+ */
+public class NistMirrorTask implements LoggableSubscriber {
 
     private static final String CVE_XML_12_MODIFIED_URL = "https://nvd.nist.gov/download/nvdcve-Modified.xml.gz";
     private static final String CVE_XML_20_MODIFIED_URL = "https://nvd.nist.gov/feeds/xml/cve/nvdcve-2.0-Modified.xml.gz";
@@ -54,6 +60,9 @@ public class NistMirrorTask implements Subscriber {
     private static final Logger LOGGER = Logger.getLogger(NistMirrorTask.class);
 
 
+    /**
+     * {@inheritDoc}
+     */
     public void inform(Event e) {
         if (e instanceof NistMirrorEvent) {
             LOGGER.info("Starting NIST mirroring task");
@@ -64,6 +73,9 @@ public class NistMirrorTask implements Subscriber {
         }
     }
 
+    /**
+     * Download all NVD XML and JSON feeds from NIST.
+     */
     private void getAllFiles() {
         final Date currentDate = new Date();
         LOGGER.info("Downloading files at " + currentDate);
@@ -80,6 +92,11 @@ public class NistMirrorTask implements Subscriber {
         doDownload(CVE_JSON_10_MODIFIED_URL);
     }
 
+    /**
+     * Defines the output directory where the mirrored files will be stored.
+     * Creates the directory if non-existent.
+     * @param outputDirPath the target output directory path
+     */
     private void setOutputDir(String outputDirPath) {
         outputDir = new File(outputDirPath);
         if (!outputDir.exists()) {
@@ -87,6 +104,12 @@ public class NistMirrorTask implements Subscriber {
         }
     }
 
+    /**
+     * Performs a HTTP HEAD request to determine if a URL has updates since the last
+     * time it was requested.
+     * @param cveUrl the URL to perform a HTTP HEAD request on
+     * @return the length of the content if it were to be downloaded
+     */
     private long checkHead(String cveUrl) {
         try {
             final URL url = new URL(cveUrl);
@@ -101,6 +124,10 @@ public class NistMirrorTask implements Subscriber {
         return 0;
     }
 
+    /**
+     * Performs a download of specified URL.
+     * @param cveUrl the URL contents to download
+     */
     private void doDownload(String cveUrl) {
         BufferedInputStream bis = null;
         BufferedOutputStream bos = null;
@@ -128,17 +155,26 @@ public class NistMirrorTask implements Subscriber {
                 }
             }
 
-            final URLConnection connection = url.openConnection(proxy);
-            LOGGER.info("Downloading " + url.toExternalForm());
-            bis = new BufferedInputStream(connection.getInputStream());
-            file = new File(outputDir, filename);
-            bos = new BufferedOutputStream(new FileOutputStream(file));
+            LOGGER.info("Initiating download of " + url.toExternalForm());
+            final HttpURLConnection connection = (HttpURLConnection)url.openConnection(proxy);
+            if (connection.getResponseCode() == 200) {
+                LOGGER.info("Downloading...");
+                bis = new BufferedInputStream(connection.getInputStream());
+                file = new File(outputDir, filename);
+                bos = new BufferedOutputStream(new FileOutputStream(file));
 
-            int i;
-            while ((i = bis.read()) != -1) {
-                bos.write(i);
+                int i;
+                while ((i = bis.read()) != -1) {
+                    bos.write(i);
+                }
+                success = true;
+            } else if (connection.getResponseCode() == 403) {
+                LOGGER.warn("Unable to download - HTTP Response 403: " + connection.getResponseMessage());
+                LOGGER.warn("This may occur if the NVD is throttling connections due to excessive load or repeated " +
+                        "connections from the same IP address or as a result of firewall or proxy authentication failures");
+            } else {
+                LOGGER.warn("Unable to download - HTTP Response " + connection.getResponseCode() + ": " + connection.getResponseMessage());
             }
-            success = true;
         } catch (IOException e) {
             LOGGER.error("Download failed : " + e.getLocalizedMessage());
         } finally {
@@ -150,6 +186,10 @@ public class NistMirrorTask implements Subscriber {
         }
     }
 
+    /**
+     * Extracts a GZip file.
+     * @param file the file to extract
+     */
     private void uncompress(File file) {
         final byte[] buffer = new byte[1024];
         GZIPInputStream gzis = null;
@@ -173,6 +213,10 @@ public class NistMirrorTask implements Subscriber {
         }
     }
 
+    /**
+     * Closes a closable object.
+     * @param object the object to close
+     */
     private void close(Closeable object) {
         if (object != null) {
             try {

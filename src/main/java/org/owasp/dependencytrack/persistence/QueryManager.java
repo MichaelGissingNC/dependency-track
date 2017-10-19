@@ -21,6 +21,7 @@ import alpine.event.framework.SingleThreadedEventService;
 import alpine.persistence.AlpineQueryManager;
 import alpine.persistence.PaginatedResult;
 import alpine.resources.AlpineRequest;
+import org.apache.commons.lang3.StringUtils;
 import org.owasp.dependencytrack.event.IndexEvent;
 import org.owasp.dependencytrack.model.Component;
 import org.owasp.dependencytrack.model.ComponentMetrics;
@@ -40,13 +41,14 @@ import javax.jdo.Query;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * This QueryManager provides a concrete extension of {@link AlpineQueryManager} by
  * providing methods that operate on the Dependency-Track specific models.
  *
  * @author Steve Springett
- * @since 1.0.0
+ * @since 3.0.0
  */
 public class QueryManager extends AlpineQueryManager {
 
@@ -109,11 +111,14 @@ public class QueryManager extends AlpineQueryManager {
         final List<Tag> resolvedTags = new ArrayList<>();
         final List<String> unresolvedTags = new ArrayList<>();
         for (Tag tag: tags) {
-            final Tag resolvedTag = getTagByName(tag.getName());
-            if (resolvedTag != null) {
-                resolvedTags.add(resolvedTag);
-            } else {
-                unresolvedTags.add(tag.getName());
+            final String trimmedTag = StringUtils.trimToNull(tag.getName());
+            if (trimmedTag != null) {
+                final Tag resolvedTag = getTagByName(trimmedTag);
+                if (resolvedTag != null) {
+                    resolvedTags.add(resolvedTag);
+                } else {
+                    unresolvedTags.add(trimmedTag);
+                }
             }
         }
         resolvedTags.addAll(createTags(unresolvedTags));
@@ -127,8 +132,9 @@ public class QueryManager extends AlpineQueryManager {
      */
     @SuppressWarnings("unchecked")
     public Tag getTagByName(String name) {
+        final String trimmedTag = StringUtils.trimToNull(name);
         final Query query = pm.newQuery(Tag.class, "name == :name");
-        final List<Tag> result = (List<Tag>) query.execute(name);
+        final List<Tag> result = (List<Tag>) query.execute(trimmedTag);
         return result.size() == 0 ? null : result.get(0);
     }
 
@@ -138,16 +144,14 @@ public class QueryManager extends AlpineQueryManager {
      * @return the created Tag object
      */
     public Tag createTag(String name) {
-        final Tag resolvedTag = getTagByName(name);
+        final String trimmedTag = StringUtils.trimToNull(name);
+        final Tag resolvedTag = getTagByName(trimmedTag);
         if (resolvedTag != null) {
             return resolvedTag;
         }
         final Tag tag = new Tag();
-        tag.setName(name);
-        pm.currentTransaction().begin();
-        pm.makePersistent(tag);
-        pm.currentTransaction().commit();
-        return pm.getObjectById(Tag.class, tag.getId());
+        tag.setName(trimmedTag);
+        return persist(tag);
     }
 
     /**
@@ -158,16 +162,14 @@ public class QueryManager extends AlpineQueryManager {
     public List<Tag> createTags(List<String> names) {
         final List<Tag> newTags = new ArrayList<>();
         for (String name: names) {
-            if (getTagByName(name) == null) {
+            final String trimmedTag = StringUtils.trimToNull(name);
+            if (getTagByName(trimmedTag) == null) {
                 final Tag tag = new Tag();
-                tag.setName(name);
+                tag.setName(trimmedTag);
                 newTags.add(tag);
             }
         }
-        pm.currentTransaction().begin();
-        pm.makePersistentAll(newTags);
-        pm.currentTransaction().commit();
-        return newTags;
+        return new ArrayList<>(persist(newTags));
     }
 
     /**
@@ -189,11 +191,7 @@ public class QueryManager extends AlpineQueryManager {
         if (parent != null) {
             project.setParent(parent);
         }
-        pm.currentTransaction().begin();
-        pm.makePersistent(project);
-        pm.currentTransaction().commit();
-        pm.getFetchPlan().setDetachmentOptions(FetchPlan.DETACH_LOAD_FIELDS);
-        final Project result = pm.getObjectById(Project.class, project.getId());
+        final Project result = persist(project);
         SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.CREATE, pm.detachCopy(result)));
         commitSearchIndex(commitIndex, Project.class);
         return result;
@@ -201,18 +199,21 @@ public class QueryManager extends AlpineQueryManager {
 
     /**
      * Updates an existing Project.
-     * @param transientProject the project to update
+     * @param uuid the uuid of the project to update
+     * @param name the name of the project
+     * @param description a description of the project
+     * @param version the project version
+     * @param tags a List of Tags - these will be resolved if necessary
      * @param commitIndex specifies if the search index should be committed (an expensive operation)
      * @return the updated Project
      */
-    public Project updateProject(Project transientProject, boolean commitIndex) {
-        final Project project = getObjectByUuid(Project.class, transientProject.getUuid());
-        pm.currentTransaction().begin();
-        project.setName(transientProject.getName());
-        project.setVersion(transientProject.getVersion());
-        pm.currentTransaction().commit();
-        pm.getFetchPlan().setDetachmentOptions(FetchPlan.DETACH_LOAD_FIELDS);
-        final Project result = pm.getObjectById(Project.class, project.getId());
+    public Project updateProject(UUID uuid, String name, String description, String version, List<Tag> tags, boolean commitIndex) {
+        final Project project = getObjectByUuid(Project.class, uuid);
+        project.setName(name);
+        project.setDescription(description);
+        project.setVersion(version);
+        project.setTags(resolveTags(tags));
+        final Project result = persist(project);
         SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.UPDATE, pm.detachCopy(result)));
         commitSearchIndex(commitIndex, Project.class);
         return result;
@@ -232,6 +233,7 @@ public class QueryManager extends AlpineQueryManager {
         final Project result = pm.getObjectById(Project.class, project.getId());
         SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.DELETE, pm.detachCopy(result)));
 
+        deleteProjectMetrics(project);
         delete(project.getProperties());
         delete(getScans(project));
         delete(project.getChildren());
@@ -250,10 +252,7 @@ public class QueryManager extends AlpineQueryManager {
         property.setProject(project);
         property.setKey(key);
         property.setValue(value);
-        pm.currentTransaction().begin();
-        pm.makePersistent(property);
-        pm.currentTransaction().commit();
-        return pm.getObjectById(ProjectProperty.class, property.getId());
+        return persist(property);
     }
 
     /**
@@ -268,10 +267,7 @@ public class QueryManager extends AlpineQueryManager {
         scan.setExecuted(executed);
         scan.setImported(imported);
         scan.setProject(project);
-        pm.currentTransaction().begin();
-        pm.makePersistent(scan);
-        pm.currentTransaction().commit();
-        return pm.getObjectById(Scan.class, scan.getId());
+        return persist(scan);
     }
 
     /**
@@ -345,12 +341,7 @@ public class QueryManager extends AlpineQueryManager {
         }
         component.setResolvedLicense(resolvedLicense);
         component.setParent(parent);
-        pm.currentTransaction().begin();
-        pm.makePersistent(component);
-        pm.currentTransaction().commit();
-
-        pm.getFetchPlan().setDetachmentOptions(FetchPlan.DETACH_LOAD_FIELDS);
-        final Component result = pm.getObjectById(Component.class, component.getId());
+        final Component result = persist(component);
         SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.CREATE, pm.detachCopy(result)));
         commitSearchIndex(commitIndex, Component.class);
         return result;
@@ -375,9 +366,7 @@ public class QueryManager extends AlpineQueryManager {
         component.setLicense(transientComponent.getLicense());
         component.setResolvedLicense(transientComponent.getResolvedLicense());
         component.setParent(transientComponent.getParent());
-        pm.currentTransaction().commit();
-        pm.getFetchPlan().setDetachmentOptions(FetchPlan.DETACH_LOAD_FIELDS);
-        final Component result = pm.getObjectById(Component.class, component.getId());
+        final Component result = persist(component);
         SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.UPDATE, pm.detachCopy(result)));
         commitSearchIndex(commitIndex, Component.class);
         return result;
@@ -423,10 +412,7 @@ public class QueryManager extends AlpineQueryManager {
         evidence.setSource(source);
         evidence.setName(name);
         evidence.setValue(value);
-        pm.currentTransaction().begin();
-        pm.makePersistent(evidence);
-        pm.currentTransaction().commit();
-        return pm.getObjectById(Evidence.class, evidence.getId());
+        return persist(evidence);
     }
 
     /**
@@ -465,7 +451,7 @@ public class QueryManager extends AlpineQueryManager {
      */
     public License createLicense(License license, boolean commitIndex) {
         final License result = persist(license);
-        SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.CREATE, result));
+        SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.CREATE, pm.detachCopy(result)));
         commitSearchIndex(commitIndex, License.class);
         return result;
     }
@@ -478,7 +464,7 @@ public class QueryManager extends AlpineQueryManager {
      */
     public Vulnerability createVulnerability(Vulnerability vulnerability, boolean commitIndex) {
         final Vulnerability result = persist(vulnerability);
-        SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.CREATE, result));
+        SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.CREATE, pm.detachCopy(result)));
         commitSearchIndex(commitIndex, Vulnerability.class);
         return result;
     }
@@ -524,7 +510,7 @@ public class QueryManager extends AlpineQueryManager {
             vulnerability.setMatchedCPE(transientVulnerability.getMatchedCPE());
 
             final Vulnerability result = persist(vulnerability);
-            SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.UPDATE, result));
+            SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.UPDATE, pm.detachCopy(result)));
             commitSearchIndex(commitIndex, Vulnerability.class);
             return result;
         }
@@ -561,7 +547,7 @@ public class QueryManager extends AlpineQueryManager {
     }
 
     /**
-     * Returns a vulnerability by it's name (i.e. CVE-2017-0001) and source
+     * Returns a vulnerability by it's name (i.e. CVE-2017-0001) and source.
      * @param source the source of the vulnerability
      * @param vulnId the name of the vulnerability
      * @return the matching Vulnerability object, or null if not found
@@ -575,7 +561,7 @@ public class QueryManager extends AlpineQueryManager {
     }
 
     /**
-     * Adds a vulnerability to a component
+     * Adds a vulnerability to a component.
      * @param vulnerability the vulnerabillity to add
      * @param component the component affected by the vulnerabiity
      */
@@ -591,7 +577,7 @@ public class QueryManager extends AlpineQueryManager {
     }
 
     /**
-     * Removes a vulnerability from a component
+     * Removes a vulnerability from a component.
      * @param vulnerability the vulnerabillity to remove
      * @param component the component unaffected by the vulnerabiity
      */
@@ -641,10 +627,7 @@ public class QueryManager extends AlpineQueryManager {
         cwe = new Cwe();
         cwe.setCweId(id);
         cwe.setName(name);
-        pm.currentTransaction().begin();
-        pm.makePersistent(cwe);
-        pm.currentTransaction().commit();
-        return pm.getObjectById(Cwe.class, cwe.getId());
+        return persist(cwe);
     }
 
     /**
@@ -696,10 +679,7 @@ public class QueryManager extends AlpineQueryManager {
         dependency.setAddedBy(addedBy);
         dependency.setAddedOn(new Date());
         dependency.setNotes(notes);
-        pm.currentTransaction().begin();
-        pm.makePersistent(dependency);
-        pm.currentTransaction().commit();
-        return pm.getObjectById(Dependency.class, dependency.getId());
+        return persist(dependency);
     }
 
     /**
@@ -889,6 +869,7 @@ public class QueryManager extends AlpineQueryManager {
 
     /**
      * Retrieves the most recent ProjectMetrics.
+     * @param project the Project to retrieve metrics for
      * @return a ProjectMetrics object
      */
     @SuppressWarnings("unchecked")
@@ -901,6 +882,7 @@ public class QueryManager extends AlpineQueryManager {
 
     /**
      * Retrieves ProjectMetrics in descending order starting with the most recent.
+     * @param project the Project to retrieve metrics for
      * @return a PaginatedResult object
      */
     @SuppressWarnings("unchecked")
@@ -911,7 +893,17 @@ public class QueryManager extends AlpineQueryManager {
     }
 
     /**
+     * Deleted all metrics associated for the specified Project.
+     * @param project the Project to delete metrics for
+     */
+    public void deleteProjectMetrics(Project project) {
+        final Query query = pm.newQuery(ProjectMetrics.class, "project == :project");
+        query.deletePersistentAll(project);
+    }
+
+    /**
      * Retrieves the most recent ComponentMetrics.
+     * @param component the Component to retrieve metrics for
      * @return a ComponentMetrics object
      */
     @SuppressWarnings("unchecked")
@@ -924,6 +916,7 @@ public class QueryManager extends AlpineQueryManager {
 
     /**
      * Retrieves ComponentMetrics in descending order starting with the most recent.
+     * @param component the Component to retrieve metrics for
      * @return a PaginatedResult object
      */
     @SuppressWarnings("unchecked")

@@ -32,6 +32,12 @@ import javax.validation.constraints.Size;
 import java.io.Serializable;
 import java.util.List;
 
+/**
+ * Model for assigning tags to specific objects.
+ *
+ * @author Steve Springett
+ * @since 3.0.0
+ */
 @PersistenceCapable
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class Tag implements Serializable {
@@ -47,7 +53,7 @@ public class Tag implements Serializable {
     @Column(name = "NAME", allowsNull = "false")
     @NotNull
     @Size(min = 1, max = 255)
-    @Pattern(regexp = RegexSequence.Definition.WORD_CHARS, message = "The name may only contain word characters")
+    @Pattern(regexp = RegexSequence.Definition.PRINTABLE_CHARS, message = "The name may only contain printable characters")
     private String name;
 
     @Persistent

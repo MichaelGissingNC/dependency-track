@@ -206,15 +206,29 @@ $(document).ready(function () {
 });
 
 /**
+ * Displays an error modal with the specified message. If the responseText
+ * from an AJAX response is available, that text will be used. If not, the
+ * fallback message will be used instead.
+ */
+function displayErrorModal(xhr, fallbackMessage) {
+    let message = fallbackMessage;
+    if (xhr && xhr.responseText && xhr.responseText.trim()) {
+        message = xhr.responseText.trim();
+    }
+    $("#modal-genericError").modal("show");
+    $("#modal-genericErrorContent").html(message);
+}
+
+/**
  * Creates a multi-color progress bar consisting of the number of
  * critical, high, medium, and low severity vulnerabilities.
  */
 function generateSeverityProgressBar(critical, high, medium, low) {
-    var percentCritical = (critical/(critical+high+medium+low))*100;
-    var percentHigh = (high/(critical+high+medium+low))*100;
-    var percentMedium = (medium/(critical+high+medium+low))*100;
-    var percentLow = (low/(critical+high+medium+low))*100;
-    var block = '<span class="progress">';
+    let percentCritical = (critical/(critical+high+medium+low))*100;
+    let percentHigh = (high/(critical+high+medium+low))*100;
+    let percentMedium = (medium/(critical+high+medium+low))*100;
+    let percentLow = (low/(critical+high+medium+low))*100;
+    let block = '<span class="progress">';
     if (critical > 0) {
         block += '<div class="progress-bar severity-critical-bg" data-toggle="tooltip" data-placement="top" title="Critical: ' + critical + ' (' + Math.round(percentCritical*10)/10 + '%)" style="width:' + percentCritical+ '%">' + critical + '</div>';
     }
@@ -235,6 +249,45 @@ function generateSeverityProgressBar(critical, high, medium, low) {
 }
 
 /**
+ * Given a UNIX timestamp, this function will return a formatted date.
+ * i.e. 15 Jan 2017
+ */
+function formatTimestamp(timestamp) {
+    let date = new Date(timestamp);
+    let months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return date.getDate() + " " + months[date.getMonth()] + " " + date.getFullYear();
+}
+
+/**
+ * Formats and returns a specialized label for a vulnerability source (NVD, NSP, VulnDB, etc).
+ */
+function formatSourceLabel(source) {
+    let sourceClass = "label-source-" + source.toLowerCase();
+    return `<span class="label ${sourceClass}">${source}</span>`;
+}
+
+/**
+ * Formats and returns a specialized label for the severity of a vulnerability.
+ */
+function formatSeverityLabel(severity) {
+    if (!severity) {
+        return;
+    }
+    let severityLabel = capitalize(severity);
+    let severityClass = "severity-" + severity.toLowerCase() + "-bg";
+
+    return `
+     <div style="height:24px;margin:-4px;">
+        <div class="${severityClass} text-center pull-left" style="width:24px; height:24px; color:#ffffff">
+            <i class="fa fa-bug" style="font-size:12px; padding:6px" aria-hidden="true"></i>
+         </div>
+         <div class="text-center pull-left" style="height:24px;">
+             <div style="font-size:12px; padding:4px"><span class="severity-value">${severityLabel}</span></div>
+         </div>
+     </div>`;
+}
+
+/**
  * Changes the first letter to uppercase and the remaining letters to lowercase.
  */
 function capitalize(string) {
@@ -242,6 +295,20 @@ function capitalize(string) {
         return string.charAt(0).toUpperCase() + string.slice(1).toLowerCase();
     }
     return string;
+}
+
+/**
+ * Given a comma-separated string, creates an array of objects.
+ */
+function csvStringToObjectArray(csvString) {
+    let csvArray = [];
+    if (!$common.isEmpty(csvString)) {
+        let tmpArray = csvString.split(",");
+        for (let i in tmpArray) {
+            csvArray.push({name: tmpArray[i]});
+        }
+    }
+    return csvArray;
 }
 
 /**
@@ -280,7 +347,7 @@ $.extend({
      */
     getUrlVars: function() {
         let vars = [], hash;
-        let hashes = window.location.href.slice(window.location.href.indexOf("?") + 1).split("&");
+        let hashes = window.location.href.replace("#", "").slice(window.location.href.indexOf("?") + 1).split("&");
         for(let i = 0; i < hashes.length; i++) {
             hash = hashes[i].split("=");
             vars.push(hash[0]);

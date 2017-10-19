@@ -24,7 +24,7 @@ function formatProjectsTable(res) {
     let projectsTable = $("#projectsTable");
     for (let i=0; i<res.length; i++) {
         let projecturl = "../project/?uuid=" + res[i].uuid;
-        res[i].projecthref = "<a href=\"" + projecturl + "\">" + res[i].name + "</a>";
+        res[i].projecthref = "<a href=\"" + projecturl + "\">" + filterXSS(res[i].name) + "</a>";
 
         $rest.getProjectCurrentMetrics(res[i].uuid, function (data) {
             res[i].vulnerabilities = generateSeverityProgressBar(data.critical, data.high, data.medium, data.low);
@@ -39,21 +39,6 @@ function formatProjectsTable(res) {
 
 function projectCreated(data) {
     $("#projectsTable").bootstrapTable("refresh", {silent: true});
-}
-
-/**
- * Given a comma-separated string of tags, creates an
- * array of tag objects.
- */
-function tagsStringToObjectArray(tagsString) {
-    let tagsArray = [];
-    if (!$common.isEmpty(tagsString)) {
-        let tmpArray = tagsString.split(",");
-        for (let i in tmpArray) {
-            tagsArray.push({name: tmpArray[i]});
-        }
-    }
-    return tagsArray;
 }
 
 /**
@@ -79,7 +64,7 @@ $(document).ready(function () {
         const name = $("#createProjectNameInput").val();
         const version = $("#createProjectVersionInput").val();
         const description = $("#createProjectDescriptionInput").val();
-        const tags = tagsStringToObjectArray($("#createProjectTagsInput").val());
+        const tags = csvStringToObjectArray($("#createProjectTagsInput").val());
         $rest.createProject(name, version, description, tags, projectCreated);
         clearInputFields();
     });
