@@ -1,18 +1,19 @@
 /*
  * This file is part of Dependency-Track.
  *
- * Dependency-Track is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option) any
- * later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Dependency-Track is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU General Public License along with
- * Dependency-Track. If not, see http://www.gnu.org/licenses/.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) Steve Springett. All Rights Reserved.
  */
 package org.owasp.dependencytrack.resources.v1;
 
@@ -29,6 +30,7 @@ import io.swagger.annotations.ResponseHeader;
 import org.apache.commons.lang.StringUtils;
 import org.owasp.dependencytrack.auth.Permission;
 import org.owasp.dependencytrack.model.Project;
+import org.owasp.dependencytrack.model.Tag;
 import org.owasp.dependencytrack.persistence.QueryManager;
 import javax.validation.Validator;
 import javax.ws.rs.Consumes;
@@ -96,6 +98,30 @@ public class ProjectResource extends AlpineResource {
         }
     }
 
+    @GET
+    @Path("/tag/{tag}")
+    @Produces(MediaType.APPLICATION_JSON)
+    @ApiOperation(
+            value = "Returns a list of all projects by tag",
+            response = Project.class,
+            responseContainer = "List",
+            responseHeaders = @ResponseHeader(name = TOTAL_COUNT_HEADER, response = Long.class, description = "The total number of projects with the tag")
+    )
+    @ApiResponses(value = {
+            @ApiResponse(code = 401, message = "Unauthorized")
+    })
+    @PermissionRequired(Permission.PROJECT_VIEW)
+    public Response getProjectsByTag(
+            @ApiParam(value = "The tag to query on", required = true)
+            @PathParam("tag") String tagString) {
+        try (QueryManager qm = new QueryManager(getAlpineRequest())) {
+
+            Tag tag = qm.getTagByName(tagString);
+            final PaginatedResult result = qm.getProjects(tag);
+            return Response.ok(result.getObjects()).header(TOTAL_COUNT_HEADER, result.getTotal()).build();
+        }
+    }
+
     @PUT
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
@@ -115,7 +141,8 @@ public class ProjectResource extends AlpineResource {
         failOnValidationError(
                 validator.validateProperty(jsonProject, "name"),
                 validator.validateProperty(jsonProject, "description"),
-                validator.validateProperty(jsonProject, "version")
+                validator.validateProperty(jsonProject, "version"),
+                validator.validateProperty(jsonProject, "purl")
         );
 
         try (QueryManager qm = new QueryManager()) {
@@ -131,6 +158,7 @@ public class ProjectResource extends AlpineResource {
                         StringUtils.trimToNull(jsonProject.getVersion()),
                         jsonProject.getTags(),
                         parent,
+                        StringUtils.trimToNull(jsonProject.getPurl()),
                         true);
                 return Response.status(Response.Status.CREATED).entity(project).build();
             } else {
@@ -158,7 +186,8 @@ public class ProjectResource extends AlpineResource {
         failOnValidationError(
                 validator.validateProperty(jsonProject, "name"),
                 validator.validateProperty(jsonProject, "description"),
-                validator.validateProperty(jsonProject, "version")
+                validator.validateProperty(jsonProject, "version"),
+                validator.validateProperty(jsonProject, "purl")
         );
 
         try (QueryManager qm = new QueryManager()) {
@@ -166,12 +195,18 @@ public class ProjectResource extends AlpineResource {
             if (project != null) {
                 final Project tmpProject = qm.getProject(jsonProject.getName().trim());
                 if (tmpProject == null || (tmpProject.getUuid().equals(project.getUuid()))) {
+                    // Name cannot be empty or null - prevent it
+                    String name = StringUtils.trimToNull(jsonProject.getName());
+                    if (name != null) {
+                        project.setName(name);
+                    }
                     project = qm.updateProject(
                             jsonProject.getUuid(),
-                            jsonProject.getName().trim(),
+                            name,
                             StringUtils.trimToNull(jsonProject.getDescription()),
                             StringUtils.trimToNull(jsonProject.getVersion()),
                             jsonProject.getTags(),
+                            StringUtils.trimToNull(jsonProject.getPurl()),
                             true);
                     return Response.ok(project).build();
                 } else {
@@ -203,7 +238,7 @@ public class ProjectResource extends AlpineResource {
         try (QueryManager qm = new QueryManager()) {
             final Project project = qm.getObjectByUuid(Project.class, uuid, Project.FetchGroup.ALL.name());
             if (project != null) {
-                qm.recursivelyDeleteProject(project);
+                qm.recursivelyDelete(project);
                 return Response.status(Response.Status.NO_CONTENT).build();
             } else {
                 return Response.status(Response.Status.NOT_FOUND).entity("The UUID of the project could not be found.").build();

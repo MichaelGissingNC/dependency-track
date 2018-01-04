@@ -1,27 +1,29 @@
 /*
  * This file is part of Dependency-Track.
  *
- * Dependency-Track is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option) any
- * later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Dependency-Track is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU General Public License along with
- * Dependency-Track. If not, see http://www.gnu.org/licenses/.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) Steve Springett. All Rights Reserved.
  */
 package org.owasp.dependencytrack.tasks;
 
 import alpine.event.LdapSyncEvent;
 import alpine.tasks.AlpineTaskScheduler;
 import org.owasp.dependencytrack.event.DependencyCheckEvent;
-import org.owasp.dependencytrack.event.NistMirrorEvent;
 import org.owasp.dependencytrack.event.MetricsUpdateEvent;
+import org.owasp.dependencytrack.event.NistMirrorEvent;
 import org.owasp.dependencytrack.event.NspMirrorEvent;
+import org.owasp.dependencytrack.event.VulnDbSyncEvent;
 
 /**
  * A Singleton implementation of {@link AlpineTaskScheduler} that configures scheduled and repeatable tasks.
@@ -48,8 +50,14 @@ public final class TaskScheduler extends AlpineTaskScheduler {
         // Creates a new event that executes every 24 hours (86400000) after an initial 1 minute (60000) delay
         scheduleEvent(new NistMirrorEvent(), 60000, 86400000);
 
+        // Creates a new event that executes every 24 hours (86400000) after an initial 1 minute (60000) delay
+        scheduleEvent(new VulnDbSyncEvent(), 60000, 86400000);
+
         // Creates a new event that executes every 1 hour (3600000) after an initial 10 second (10000) delay
-        scheduleEvent(new MetricsUpdateEvent(), 10000, 3600000);
+        scheduleEvent(new MetricsUpdateEvent(MetricsUpdateEvent.Type.PORTFOLIO), 10000, 3600000);
+
+        // Creates a new event that executes every 1 hour (3600000) after an initial 10 second (10000) delay
+        scheduleEvent(new MetricsUpdateEvent(MetricsUpdateEvent.Type.VULNERABILITY), 10000, 3600000);
 
         // Creates a new event that executes every 6 hours (21600000) after an initial 1 minute (60000) delay
         scheduleEvent(new DependencyCheckEvent(DependencyCheckEvent.Action.ANALYZE), 60000, 21600000);

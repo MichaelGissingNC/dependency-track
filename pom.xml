@@ -2,18 +2,19 @@
 <!--
   ~ This file is part of Dependency-Track.
   ~
-  ~ Dependency-Track is free software: you can redistribute it and/or modify it
-  ~ under the terms of the GNU General Public License as published by the Free
-  ~ Software Foundation, either version 3 of the License, or (at your option) any
-  ~ later version.
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
   ~
-  ~ Dependency-Track is distributed in the hope that it will be useful, but
-  ~ WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-  ~ FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
-  ~ details.
+  ~     http://www.apache.org/licenses/LICENSE-2.0
   ~
-  ~ You should have received a copy of the GNU General Public License along with
-  ~ Dependency-Track. If not, see http://www.gnu.org/licenses/.
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  ~
+  ~ Copyright (c) Steve Springett. All Rights Reserved.
   -->
 
 <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
@@ -34,7 +35,7 @@
     <name>Dependency-Track</name>
     <url>https://www.owasp.org/index.php/OWASP_Dependency_Track</url>
     <description>
-        OWASP Dependency-Track is an intelligent Software Composition Analysis (SCA) application
+        Dependency-Track is an intelligent Software Composition Analysis (SCA) application
         that allows organizations to automatically ingest and identify third-party components and
         any inherited vulnerabilities from their use.
     </description>
@@ -45,8 +46,8 @@
 
     <licenses>
         <license>
-            <name>GNU General Public License v3.0</name>
-            <url>http://www.gnu.org/licenses/gpl-3.0.txt</url>
+            <name>Apache-2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
             <distribution>repo</distribution>
         </license>
     </licenses>
@@ -66,11 +67,9 @@
 
     <properties>
         <!-- Dependency Versions -->
-        <lib.lucene.version>4.7.2</lib.lucene.version>
-        <lib.dependency-check.version>2.1.2-SNAPSHOT</lib.dependency-check.version>
-        <lib.unirest.version>1.4.9</lib.unirest.version>
-        <lib.scribejava.version>4.2.0</lib.scribejava.version>
-        <lib.signpost-core.version>1.2.1.2</lib.signpost-core.version>
+        <lib.lucene.version>5.5.5</lib.lucene.version>
+        <lib.dependency-check.version>3.1.0</lib.dependency-check.version>
+        <lib.vulndb-data-mirror.version>1.0.0-SNAPSHOT</lib.vulndb-data-mirror.version>
         <!-- build properties -->
         <plugin.retirejs.breakOnFailure>false</plugin.retirejs.breakOnFailure>
     </properties>
@@ -179,11 +178,11 @@
             <version>6.0.26</version>
         </dependency>
         -->
-        <!-- OAuth 1.0a Signing Request -->
+        <!-- VulnDB data mirroring and parsing -->
         <dependency>
-            <groupId>oauth.signpost</groupId>
-            <artifactId>signpost-core</artifactId>
-            <version>${lib.signpost-core.version}</version>
+            <groupId>us.springett</groupId>
+            <artifactId>vulndb-data-mirror</artifactId>
+            <version>${lib.vulndb-data-mirror.version}</version>
         </dependency>
     </dependencies>
 
@@ -198,7 +197,7 @@
                 <directory>src/main/resources</directory>
                 <filtering>true</filtering>
                 <includes>
-                    <include>application.properties</include>
+                    <include>application.version</include>
                 </includes>
             </resource>
         </resources>

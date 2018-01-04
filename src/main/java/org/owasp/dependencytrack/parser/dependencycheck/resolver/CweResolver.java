@@ -1,18 +1,19 @@
 /*
  * This file is part of Dependency-Track.
  *
- * Dependency-Track is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option) any
- * later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Dependency-Track is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU General Public License along with
- * Dependency-Track. If not, see http://www.gnu.org/licenses/.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) Steve Springett. All Rights Reserved.
  */
 package org.owasp.dependencytrack.parser.dependencycheck.resolver;
 
@@ -29,33 +30,37 @@ import org.owasp.dependencytrack.persistence.QueryManager;
  */
 public class CweResolver {
 
+    private QueryManager qm;
+
+    public CweResolver(QueryManager qm) {
+        this.qm = qm;
+    }
+
     /**
      * Resolves a CWE by its string representation.
      * @param cweString the string to resolve
      */
     public Cwe resolve(String cweString) {
-        try (QueryManager qm = new QueryManager()) {
-            if (StringUtils.isNotBlank(cweString)) {
-                String lookupString = "";
-                if (cweString.startsWith("CWE-") && cweString.contains(" ")) {
-                    // This is likely to be in the following format:
-                    // CWE-264 Permissions, Privileges, and Access Controls
-                    lookupString = cweString.substring(4, cweString.indexOf(" "));
-                } else if (cweString.startsWith("CWE-") && cweString.length() < 9) {
-                    // This is likely to be in the following format:
-                    // CWE-264
-                    lookupString = cweString.substring(4, cweString.length());
-                } else if (cweString.length() < 5) {
-                    // This is likely to be in the following format:
-                    // 264
-                    lookupString = cweString;
-                }
+        if (StringUtils.isNotBlank(cweString)) {
+            String lookupString = "";
+            if (cweString.startsWith("CWE-") && cweString.contains(" ")) {
+                // This is likely to be in the following format:
+                // CWE-264 Permissions, Privileges, and Access Controls
+                lookupString = cweString.substring(4, cweString.indexOf(" "));
+            } else if (cweString.startsWith("CWE-") && cweString.length() < 9) {
+                // This is likely to be in the following format:
+                // CWE-264
+                lookupString = cweString.substring(4, cweString.length());
+            } else if (cweString.length() < 5) {
+                // This is likely to be in the following format:
+                // 264
+                lookupString = cweString;
+            }
 
-                try {
-                    return qm.getCweById(Integer.valueOf(lookupString));
-                } catch (NumberFormatException e) {
-                    // throw it away
-                }
+            try {
+                return qm.getCweById(Integer.valueOf(lookupString));
+            } catch (NumberFormatException e) {
+                // throw it away
             }
         }
         return null;

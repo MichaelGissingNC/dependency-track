@@ -24,13 +24,13 @@
             <ul class="nav navbar-nav navbar-right">
                 <li>
                     <div id="smart-search">
-                        <input class="typeahead" type="text" placeholder="Search...">
+                        <input id="smart-search-input" class="typeahead" type="text" placeholder="Search...">
                     </div>
                 </li>
                 <li id="nav-about"><a href="#" data-toggle="modal" data-target="#modal-about"><span class="fa fa-info-circle" aria-hidden="true"></span> About</a></li>
                 <% if(AUTHN_ENABLED) { %>
                 <li id="nav-profile"><a href="#" data-toggle="modal" data-target="#modal-profile"><span class="fa fa-user" aria-hidden="true"></span> Profile</a></li>
-                <li id="nav-logout"><a href="#" onclick="logout();"><span class="fa fa-sign-out" aria-hidden="true"></span> Logout</a></li>
+                <li id="nav-logout"><a href="#" onclick="$common.logout();"><span class="fa fa-sign-out" aria-hidden="true"></span> Logout</a></li>
                 <% } %>
             </ul>
         </div>

@@ -1,18 +1,19 @@
 /*
  * This file is part of Dependency-Track.
  *
- * Dependency-Track is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option) any
- * later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Dependency-Track is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU General Public License along with
- * Dependency-Track. If not, see http://www.gnu.org/licenses/.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) Steve Springett. All Rights Reserved.
  */
 package org.owasp.dependencytrack.resources.v1;
 
@@ -86,7 +87,7 @@ public class UserResource extends AlpineResource {
         try {
             final Principal principal = auth.authenticate();
             if (principal != null) {
-                super.addAuditableEvent(LOGGER, "Successful user login / username: " + username);
+                super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_SUCCESS, "Successful user login / username: " + username);
                 final KeyManager km = KeyManager.getInstance();
                 final JsonWebToken jwt = new JsonWebToken(km.getSecretKey());
                 final String token = jwt.createToken(principal);
@@ -94,7 +95,7 @@ public class UserResource extends AlpineResource {
             }
         } catch (AuthenticationException e) {
         }
-        super.addAuditableEvent(LOGGER, "Unauthorized login attempt / username: " + username);
+        super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_FAILURE, "Unauthorized login attempt / username: " + username);
         return Response.status(Response.Status.UNAUTHORIZED).build();
     }
 
@@ -193,7 +194,7 @@ public class UserResource extends AlpineResource {
             LdapUser user = qm.getLdapUser(jsonUser.getUsername());
             if (user == null) {
                 user = qm.createLdapUser(jsonUser.getUsername());
-                super.addAuditableEvent(LOGGER, "LDAP user created: " + jsonUser.getUsername());
+                super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_AUDIT, "LDAP user created: " + jsonUser.getUsername());
                 return Response.status(Response.Status.CREATED).entity(user).build();
             } else {
                 return Response.status(Response.Status.CONFLICT).entity("A user with the same username already exists. Cannot create new user.").build();
@@ -220,7 +221,7 @@ public class UserResource extends AlpineResource {
             final LdapUser user = qm.getLdapUser(jsonUser.getUsername());
             if (user != null) {
                 qm.delete(user);
-                super.addAuditableEvent(LOGGER, "LDAP user deleted: " + jsonUser.getUsername());
+                super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_AUDIT, "LDAP user deleted: " + jsonUser.getUsername());
                 return Response.status(Response.Status.NO_CONTENT).build();
             } else {
                 return Response.status(Response.Status.NOT_FOUND).entity("The user could not be found.").build();
@@ -252,7 +253,7 @@ public class UserResource extends AlpineResource {
             ManagedUser user = qm.getManagedUser(jsonUser.getUsername());
             if (user == null) {
                 user = qm.createManagedUser(jsonUser.getUsername(), String.valueOf(PasswordService.createHash("password".toCharArray()))); // todo password
-                super.addAuditableEvent(LOGGER, "Managed user created: " + jsonUser.getUsername());
+                super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_AUDIT, "Managed user created: " + jsonUser.getUsername());
                 return Response.status(Response.Status.CREATED).entity(user).build();
             } else {
                 return Response.status(Response.Status.CONFLICT).entity("A user with the same username already exists. Cannot create new user.").build();
@@ -279,7 +280,7 @@ public class UserResource extends AlpineResource {
             final ManagedUser user = qm.getManagedUser(jsonUser.getUsername());
             if (user != null) {
                 qm.delete(user);
-                super.addAuditableEvent(LOGGER, "Managed user deleted: " + jsonUser.getUsername());
+                super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_AUDIT, "Managed user deleted: " + jsonUser.getUsername());
                 return Response.status(Response.Status.NO_CONTENT).build();
             } else {
                 return Response.status(Response.Status.NOT_FOUND).entity("The user could not be found.").build();
@@ -319,7 +320,7 @@ public class UserResource extends AlpineResource {
             final boolean modified = qm.addUserToTeam(principal, team);
             principal = qm.getObjectById(principal.getClass(), principal.getId());
             if (modified) {
-                super.addAuditableEvent(LOGGER, "Added team membership for: " + principal.getName() + " / team: " + team.getName());
+                super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_AUDIT, "Added team membership for: " + principal.getName() + " / team: " + team.getName());
                 return Response.ok(principal).build();
             } else {
                 return Response.status(Response.Status.NOT_MODIFIED).entity("The user is already a member of the specified team.").build();
@@ -359,7 +360,7 @@ public class UserResource extends AlpineResource {
             final boolean modified = qm.removeUserFromTeam(principal, team);
             principal = qm.getObjectById(principal.getClass(), principal.getId());
             if (modified) {
-                super.addAuditableEvent(LOGGER, "Removed team membership for: " + principal.getName() + " / team: " + team.getName());
+                super.logSecurityEvent(LOGGER, SecurityMarkers.SECURITY_AUDIT, "Removed team membership for: " + principal.getName() + " / team: " + team.getName());
                 return Response.ok(principal).build();
             } else {
                 return Response.status(Response.Status.NOT_MODIFIED)

@@ -1,18 +1,19 @@
 /*
  * This file is part of Dependency-Track.
  *
- * Dependency-Track is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option) any
- * later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Dependency-Track is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU General Public License along with
- * Dependency-Track. If not, see http://www.gnu.org/licenses/.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) Steve Springett. All Rights Reserved.
  */
 package org.owasp.dependencytrack.resources.v1;
 
@@ -31,10 +32,13 @@ import io.swagger.annotations.ResponseHeader;
 import org.apache.commons.lang.StringUtils;
 import org.owasp.dependencytrack.auth.Permission;
 import org.owasp.dependencytrack.model.Component;
+import org.owasp.dependencytrack.model.License;
 import org.owasp.dependencytrack.persistence.QueryManager;
 import javax.validation.Validator;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -109,11 +113,11 @@ public class ComponentResource extends AlpineResource {
     })
     @PermissionRequired(Permission.COMPONENT_VIEW)
     public Response getComponentByHash(
-            @ApiParam(value = "The MD5 or SHA1 hash of the component to retrieve", required = true)
+            @ApiParam(value = "The MD5, SHA-1, SHA-256, SHA-512, SHA3-256, or SHA3-512 hash of the component to retrieve", required = true)
             @PathParam("hash") String hash) {
         try (QueryManager qm = new QueryManager()) {
             failOnValidationError(
-                    new ValidationTask(RegexSequence.Pattern.HASH_MD5_SHA1, hash, "Invalid MD5 or SHA1 hash.")
+                    new ValidationTask(RegexSequence.Pattern.HASH_MD5_SHA1_SHA256_SHA512, hash, "Invalid MD5, SHA-1, SHA-256, SHA-512, SHA3-256, or SHA3-512 hash.")
             );
             final Component component = qm.getComponentByHash(hash);
             if (component != null) {
@@ -144,7 +148,14 @@ public class ComponentResource extends AlpineResource {
                 validator.validateProperty(jsonComponent, "version"),
                 validator.validateProperty(jsonComponent, "group"),
                 validator.validateProperty(jsonComponent, "description"),
-                validator.validateProperty(jsonComponent, "license")
+                validator.validateProperty(jsonComponent, "license"),
+                validator.validateProperty(jsonComponent, "purl"),
+                validator.validateProperty(jsonComponent, "md5"),
+                validator.validateProperty(jsonComponent, "sha1"),
+                validator.validateProperty(jsonComponent, "sha256"),
+                validator.validateProperty(jsonComponent, "sha512"),
+                validator.validateProperty(jsonComponent, "sha3_256"),
+                validator.validateProperty(jsonComponent, "sha3_512")
         );
 
         try (QueryManager qm = new QueryManager()) {
@@ -152,17 +163,119 @@ public class ComponentResource extends AlpineResource {
             if (jsonComponent.getParent() != null && jsonComponent.getParent().getUuid() != null) {
                 parent = qm.getObjectByUuid(Component.class, jsonComponent.getParent().getUuid());
             }
-            final Component component = qm.createComponent(
-                    StringUtils.trimToNull(jsonComponent.getName()),
-                    StringUtils.trimToNull(jsonComponent.getVersion()),
-                    StringUtils.trimToNull(jsonComponent.getGroup()),
-                    null, null, null,
-                    StringUtils.trimToNull(jsonComponent.getDescription()),
-                    qm.getLicense(jsonComponent.getLicense()),
-                    null,
-                    parent,
-                    true);
+
+            final License resolvedLicense = qm.getLicense(jsonComponent.getLicense());
+            Component component = new Component();
+            component.setName(StringUtils.trimToNull(jsonComponent.getName()));
+            component.setVersion(StringUtils.trimToNull(jsonComponent.getVersion()));
+            component.setGroup(StringUtils.trimToNull(jsonComponent.getGroup()));
+            component.setFilename(StringUtils.trimToNull(jsonComponent.getFilename()));
+            component.setMd5(StringUtils.trimToNull(jsonComponent.getMd5()));
+            component.setSha1(StringUtils.trimToNull(jsonComponent.getSha1()));
+            component.setSha256(StringUtils.trimToNull(jsonComponent.getSha256()));
+            component.setSha512(StringUtils.trimToNull(jsonComponent.getSha512()));
+            component.setSha3_256(StringUtils.trimToNull(jsonComponent.getSha3_256()));
+            component.setSha3_512(StringUtils.trimToNull(jsonComponent.getSha3_512()));
+            component.setDescription(StringUtils.trimToNull(jsonComponent.getDescription()));
+            if (resolvedLicense != null) {
+                component.setLicense(null);
+                component.setResolvedLicense(resolvedLicense);
+            } else {
+                component.setLicense(StringUtils.trimToNull(jsonComponent.getLicense()));
+                component.setResolvedLicense(null);
+            }
+            component.setParent(parent);
+            component.setPurl(StringUtils.trimToNull(jsonComponent.getPurl()));
+            component.setName(StringUtils.trimToNull(jsonComponent.getName()));
+
+            component = qm.createComponent(component, true);
             return Response.status(Response.Status.CREATED).entity(component).build();
+        }
+    }
+
+    @POST
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @ApiOperation(
+            value = "Updates a component",
+            notes = "Requires 'manage component' permission.",
+            response = Component.class
+    )
+    @ApiResponses(value = {
+            @ApiResponse(code = 401, message = "Unauthorized"),
+            @ApiResponse(code = 404, message = "The UUID of the component could not be found"),
+    })
+    @PermissionRequired(Permission.COMPONENT_MANAGE)
+    public Response updateComponent(Component jsonComponent) {
+        final Validator validator = super.getValidator();
+        failOnValidationError(
+                validator.validateProperty(jsonComponent, "name"),
+                validator.validateProperty(jsonComponent, "description"),
+                validator.validateProperty(jsonComponent, "version"),
+                validator.validateProperty(jsonComponent, "group"),
+                validator.validateProperty(jsonComponent, "purl"),
+                validator.validateProperty(jsonComponent, "md5"),
+                validator.validateProperty(jsonComponent, "sha1"),
+                validator.validateProperty(jsonComponent, "sha256"),
+                validator.validateProperty(jsonComponent, "sha512"),
+                validator.validateProperty(jsonComponent, "sha3_256"),
+                validator.validateProperty(jsonComponent, "sha3_512")
+        );
+        try (QueryManager qm = new QueryManager()) {
+            Component component = qm.getObjectByUuid(Component.class, jsonComponent.getUuid());
+            if (component != null) {
+                // Name cannot be empty or null - prevent it
+                String name = StringUtils.trimToNull(jsonComponent.getName());
+                if (name != null) {
+                    component.setName(name);
+                }
+                component.setDescription(StringUtils.trimToNull(jsonComponent.getDescription()));
+                component.setVersion(StringUtils.trimToNull(jsonComponent.getVersion()));
+                component.setGroup(StringUtils.trimToNull(jsonComponent.getGroup()));
+                component.setPurl(StringUtils.trimToNull(jsonComponent.getPurl()));
+
+                final License resolvedLicense = qm.getLicense(jsonComponent.getLicense());
+                if (resolvedLicense != null) {
+                    component.setLicense(null);
+                    component.setResolvedLicense(resolvedLicense);
+                } else {
+                    component.setLicense(StringUtils.trimToNull(jsonComponent.getLicense()));
+                    component.setResolvedLicense(null);
+                }
+
+                return Response.ok(qm.updateComponent(component, true)).build();
+            } else {
+                return Response.status(Response.Status.NOT_FOUND).entity("The UUID of the component could not be found.").build();
+            }
+        }
+    }
+
+    @DELETE
+    @Path("/{uuid}")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @ApiOperation(
+            value = "Deletes a component",
+            notes = "Requires 'manage component' permission.",
+            code = 204
+    )
+    @ApiResponses(value = {
+            @ApiResponse(code = 401, message = "Unauthorized"),
+            @ApiResponse(code = 404, message = "The UUID of the component could not be found")
+    })
+    @PermissionRequired(Permission.COMPONENT_MANAGE)
+    public Response deleteComponent(
+            @ApiParam(value = "The UUID of the component to delete", required = true)
+            @PathParam("uuid") String uuid) {
+        try (QueryManager qm = new QueryManager()) {
+            final Component component = qm.getObjectByUuid(Component.class, uuid, Component.FetchGroup.ALL.name());
+            if (component != null) {
+                qm.recursivelyDelete(component, false);
+                qm.commitSearchIndex(Component.class);
+                return Response.status(Response.Status.NO_CONTENT).build();
+            } else {
+                return Response.status(Response.Status.NOT_FOUND).entity("The UUID of the component could not be found.").build();
+            }
         }
     }
 

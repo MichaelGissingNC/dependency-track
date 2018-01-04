@@ -1,18 +1,19 @@
 /*
  * This file is part of Dependency-Track.
  *
- * Dependency-Track is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option) any
- * later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Dependency-Track is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU General Public License along with
- * Dependency-Track. If not, see http://www.gnu.org/licenses/.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) Steve Springett. All Rights Reserved.
  */
 
 "use strict";
@@ -34,8 +35,8 @@ function formatComponentsTable(res) {
         }
 
         $rest.getComponentCurrentMetrics(res[i].component.uuid, function (data) {
-            res[i].component.vulnerabilities = generateSeverityProgressBar(data.critical, data.high, data.medium, data.low);
-            componentsTable.bootstrapTable('updateRow', {
+            res[i].component.vulnerabilities = $common.generateSeverityProgressBar(data.critical, data.high, data.medium, data.low);
+            componentsTable.bootstrapTable("updateRow", {
                 index: i,
                 row: res[i].component
             });
@@ -89,6 +90,8 @@ function populateProjectData(data) {
     $("#projectTitle").html(escapedProjectName);
     if (data.version) {
         $("#projectVersion").html(" &#x025B8; " + escapedProjectVersion);
+    } else {
+        $("#projectVersion").empty();
     }
     if (data.tags) {
         let html = "";
@@ -96,9 +99,23 @@ function populateProjectData(data) {
         for (let i=0; i<data.tags.length; i++) {
             let tag = data.tags[i].name;
             html += `<a href="../projects/?tag=${encodeURIComponent(tag)}"><span class="badge tag-standalone">${filterXSS(tag)}</span></a>`;
-            tagsInput.tagsinput('add', tag);
+            tagsInput.tagsinput("add", tag);
         }
         $("#tags").html(html);
+    } else {
+        $("#tags").empty();
+    }
+    if (data.properties) {
+        $("#projectPropertiesTable").css("display", "table");
+        let html = "";
+        for (let i=0; i<data.properties.length; i++) {
+            let property = data.properties[i];
+            html += `<tr><td>${filterXSS(property.key)}</td><td>${filterXSS(property.value)}</td></tr>`;
+        }
+        $("#projectPropertiesTableData").html(html);
+    } else {
+        $("#projectPropertiesTableData").empty();
+        $("#projectPropertiesTable").css("display", "none");
     }
 }
 
@@ -107,7 +124,7 @@ function populateLicenseData(data) {
     $.each(data, function() {
         select.append($("<option />").val(this.licenseId).text(this.name));
     });
-    select.selectpicker('refresh');
+    select.selectpicker("refresh");
 }
 
 function populateMetrics(data) {
@@ -122,7 +139,7 @@ function populateMetrics(data) {
  * Setup events and trigger other stuff when the page is loaded and ready
  */
 $(document).ready(function () {
-    let uuid = $.getUrlVar('uuid');
+    let uuid = $.getUrlVar("uuid");
 
     $rest.getProject(uuid, populateProjectData);
     $rest.getLicenses(populateLicenseData);
@@ -147,7 +164,7 @@ $(document).ready(function () {
         let name = $("#projectNameInput").val();
         let version = $("#projectVersionInput").val();
         let description = $("#projectDescriptionInput").val();
-        let tags = csvStringToObjectArray($("#projectTagsInput").val());
+        let tags = $common.csvStringToObjectArray($("#projectTagsInput").val());
         $rest.updateProject(uuid, name, version, description, tags, function() {
             $rest.getProject(uuid, populateProjectData);
         });

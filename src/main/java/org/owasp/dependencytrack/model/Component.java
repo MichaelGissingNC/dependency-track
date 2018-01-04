@@ -1,18 +1,19 @@
 /*
  * This file is part of Dependency-Track.
  *
- * Dependency-Track is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option) any
- * later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Dependency-Track is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU General Public License along with
- * Dependency-Track. If not, see http://www.gnu.org/licenses/.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) Steve Springett. All Rights Reserved.
  */
 package org.owasp.dependencytrack.model;
 
@@ -22,6 +23,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import javax.jdo.annotations.Column;
 import javax.jdo.annotations.Element;
 import javax.jdo.annotations.Extension;
+import javax.jdo.annotations.FetchGroup;
+import javax.jdo.annotations.FetchGroups;
 import javax.jdo.annotations.IdGeneratorStrategy;
 import javax.jdo.annotations.Index;
 import javax.jdo.annotations.Join;
@@ -45,10 +48,27 @@ import java.util.UUID;
  * @since 3.0.0
  */
 @PersistenceCapable
+@FetchGroups({
+        @FetchGroup(name = "ALL", members = {
+                @Persistent(name = "resolvedLicense"),
+                @Persistent(name = "parent"),
+                @Persistent(name = "children"),
+                @Persistent(name = "evidence"),
+                @Persistent(name = "scans"),
+                @Persistent(name = "vulnerabilities"),
+        })
+})
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class Component implements Serializable {
 
     private static final long serialVersionUID = 6841650046433674702L;
+
+    /**
+     * Defines JDO fetch groups for this class.
+     */
+    public enum FetchGroup {
+        ALL
+    }
 
     @PrimaryKey
     @Persistent(valueStrategy = IdGeneratorStrategy.NATIVE)
@@ -106,6 +126,34 @@ public class Component implements Serializable {
     @Column(name = "SHA1", jdbcType = "VARCHAR", length = 40)
     @Pattern(regexp = RegexSequence.Definition.HASH_SHA1, message = "The SHA1 hash must be a valid 40 character HEX number")
     private String sha1;
+
+    @Persistent
+    @Index(name = "COMPONENT_SHA256_IDX")
+    @Column(name = "SHA_256", jdbcType = "VARCHAR", length = 64)
+    @Pattern(regexp = RegexSequence.Definition.HASH_SHA256, message = "The SHA-256 hash must be a valid 64 character HEX number")
+    private String sha256;
+
+    @Persistent
+    @Index(name = "COMPONENT_SHA512_IDX")
+    @Column(name = "SHA_512", jdbcType = "VARCHAR", length = 128)
+    @Pattern(regexp = RegexSequence.Definition.HASH_SHA512, message = "The SHA-512 hash must be a valid 128 character HEX number")
+    private String sha512;
+
+    @Persistent
+    @Index(name = "COMPONENT_SHA3_256_IDX")
+    @Column(name = "SHA3_256", jdbcType = "VARCHAR", length = 64)
+    @Pattern(regexp = RegexSequence.Definition.HASH_SHA256, message = "The SHA3-256 hash must be a valid 64 character HEX number")
+    private String sha3_256;
+
+    @Persistent
+    @Index(name = "COMPONENT_SHA3_512_IDX")
+    @Column(name = "SHA3_512", jdbcType = "VARCHAR", length = 128)
+    @Pattern(regexp = RegexSequence.Definition.HASH_SHA512, message = "The SHA3-512 hash must be a valid 128 character HEX number")
+    private String sha3_512;
+
+    @Persistent
+    @Pattern(regexp = RegexSequence.Definition.HTTP_URI, message = "The Package URL (purl) must be a valid URI and conform to https://github.com/package-url/purl-spec")
+    private String purl;
 
     @Persistent
     @Column(name = "DESCRIPTION", jdbcType = "VARCHAR", length = 1024)
@@ -220,6 +268,46 @@ public class Component implements Serializable {
 
     public void setSha1(String sha1) {
         this.sha1 = sha1;
+    }
+
+    public String getSha256() {
+        return sha256;
+    }
+
+    public void setSha256(String sha256) {
+        this.sha256 = sha256;
+    }
+
+    public String getSha512() {
+        return sha512;
+    }
+
+    public void setSha512(String sha512) {
+        this.sha512 = sha512;
+    }
+
+    public String getSha3_256() {
+        return sha3_256;
+    }
+
+    public void setSha3_256(String sha3_256) {
+        this.sha3_256 = sha3_256;
+    }
+
+    public String getSha3_512() {
+        return sha3_512;
+    }
+
+    public void setSha3_512(String sha3_512) {
+        this.sha3_512 = sha3_512;
+    }
+
+    public String getPurl() {
+        return purl;
+    }
+
+    public void setPurl(String purl) {
+        this.purl = purl;
     }
 
     public String getDescription() {

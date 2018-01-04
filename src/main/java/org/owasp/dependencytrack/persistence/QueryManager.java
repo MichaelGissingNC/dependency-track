@@ -1,18 +1,19 @@
 /*
  * This file is part of Dependency-Track.
  *
- * Dependency-Track is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option) any
- * later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Dependency-Track is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU General Public License along with
- * Dependency-Track. If not, see http://www.gnu.org/licenses/.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) Steve Springett. All Rights Reserved.
  */
 package org.owasp.dependencytrack.persistence;
 
@@ -36,6 +37,7 @@ import org.owasp.dependencytrack.model.ProjectProperty;
 import org.owasp.dependencytrack.model.Scan;
 import org.owasp.dependencytrack.model.Tag;
 import org.owasp.dependencytrack.model.Vulnerability;
+import org.owasp.dependencytrack.model.VulnerabilityMetrics;
 import javax.jdo.FetchPlan;
 import javax.jdo.Query;
 import java.util.ArrayList;
@@ -96,6 +98,17 @@ public class QueryManager extends AlpineQueryManager {
     }
 
     /**
+     * Returns a paginated result of projects by tag.
+     * @param tag the tag associated with the Project
+     * @return a List of Projects that contain the tag
+     */
+    public PaginatedResult getProjects(Tag tag) {
+        final Query query = pm.newQuery(Project.class, "tags.contains(:tag)");
+        query.setOrdering("name asc");
+        return execute(query, tag);
+    }
+
+    /**
      * Returns a list of Tag objects what have been resolved. It resolved
      * tags by querying the database to retrieve the tag. If the tag does
      * not exist, the tag will be created and returned with other resolved
@@ -106,7 +119,7 @@ public class QueryManager extends AlpineQueryManager {
     @SuppressWarnings("unchecked")
     public synchronized List<Tag> resolveTags(List<Tag> tags) {
         if (tags == null) {
-            return null;
+            return new ArrayList<>();
         }
         final List<Tag> resolvedTags = new ArrayList<>();
         final List<String> unresolvedTags = new ArrayList<>();
@@ -179,10 +192,11 @@ public class QueryManager extends AlpineQueryManager {
      * @param version the project version
      * @param tags a List of Tags - these will be resolved if necessary
      * @param parent an optional parent Project
+     * @param purl an optional Package URL
      * @param commitIndex specifies if the search index should be committed (an expensive operation)
      * @return the created Project
      */
-    public Project createProject(String name, String description, String version, List<Tag> tags, Project parent, boolean commitIndex) {
+    public Project createProject(String name, String description, String version, List<Tag> tags, Project parent, String purl, boolean commitIndex) {
         final Project project = new Project();
         project.setName(name);
         project.setDescription(description);
@@ -191,6 +205,7 @@ public class QueryManager extends AlpineQueryManager {
         if (parent != null) {
             project.setParent(parent);
         }
+        project.setPurl(purl);
         final Project result = persist(project);
         SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.CREATE, pm.detachCopy(result)));
         commitSearchIndex(commitIndex, Project.class);
@@ -204,15 +219,20 @@ public class QueryManager extends AlpineQueryManager {
      * @param description a description of the project
      * @param version the project version
      * @param tags a List of Tags - these will be resolved if necessary
+     * @param purl an optional Package URL
      * @param commitIndex specifies if the search index should be committed (an expensive operation)
      * @return the updated Project
      */
-    public Project updateProject(UUID uuid, String name, String description, String version, List<Tag> tags, boolean commitIndex) {
+    public Project updateProject(UUID uuid, String name, String description, String version, List<Tag> tags, String purl, boolean commitIndex) {
         final Project project = getObjectByUuid(Project.class, uuid);
         project.setName(name);
         project.setDescription(description);
         project.setVersion(version);
-        project.setTags(resolveTags(tags));
+        project.setPurl(purl);
+
+        List<Tag> resolvedTags = resolveTags(tags);
+        bind(project, resolvedTags);
+
         final Project result = persist(project);
         SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.UPDATE, pm.detachCopy(result)));
         commitSearchIndex(commitIndex, Project.class);
@@ -223,17 +243,19 @@ public class QueryManager extends AlpineQueryManager {
      * Deletes a Project and all objects dependant on the project.
      * @param project the Project to delete
      */
-    public void recursivelyDeleteProject(Project project) {
+    public void recursivelyDelete(Project project) {
         if (project.getChildren() != null) {
             for (Project child: project.getChildren()) {
-                recursivelyDeleteProject(child);
+                recursivelyDelete(child);
             }
         }
         pm.getFetchPlan().setDetachmentOptions(FetchPlan.DETACH_LOAD_FIELDS);
         final Project result = pm.getObjectById(Project.class, project.getId());
         SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.DELETE, pm.detachCopy(result)));
 
-        deleteProjectMetrics(project);
+        deleteMetrics(project);
+        deleteDependencies(project);
+        deleteScans(project);
         delete(project.getProperties());
         delete(getScans(project));
         delete(project.getChildren());
@@ -282,6 +304,28 @@ public class QueryManager extends AlpineQueryManager {
     }
 
     /**
+     * Deletes scans belonging to the specified Project.
+     * @param project the Project to delete scans for
+     */
+    public void deleteScans(Project project) {
+        final Query query = pm.newQuery(Scan.class, "project == :project");
+        query.deletePersistentAll(project);
+    }
+
+    /**
+     * Deletes scans belonging to the specified Component.
+     * @param component the Component to delete scans for
+     */
+    @SuppressWarnings("unchecked")
+    public void deleteScans(Component component) {
+        final Query query = pm.newQuery(Scan.class, "components.contains(component)");
+        for (Scan scan: (List<Scan>) query.execute(component)) {
+            scan.getComponents().remove(component);
+            persist(scan);
+        }
+    }
+
+    /**
      * Returns a list of all Components defined in the datastore.
      * @return a List of Components
      */
@@ -298,49 +342,35 @@ public class QueryManager extends AlpineQueryManager {
     }
 
     /**
-     * Returns a Component by its hash. Supports MD5 and SHA1 file hashes.
+     * Returns a Component by its hash. Supports MD5, SHA-1, SHA-256, SHA-512, SHA3-256, and SHA3-512 hashes.
      * @param hash the hash of the component to retrieve
      * @return a Component, or null if not found
      */
     @SuppressWarnings("unchecked")
     public Component getComponentByHash(String hash) {
-        final Query query = pm.newQuery(Component.class, "md5 == :hash || sha1 == :hash");
+        final Query query;
+        if (hash.length() == 32) {
+            query = pm.newQuery(Component.class, "md5 == :hash");
+        } else if (hash.length() == 40) {
+            query = pm.newQuery(Component.class, "sha1 == :hash");
+        } else if (hash.length() == 64) {
+            query = pm.newQuery(Component.class, "sha256 == :hash || sha3_256 == :hash");
+        } else if (hash.length() == 128) {
+            query = pm.newQuery(Component.class, "sha512 == :hash || sha3_512 == :hash");
+        } else {
+            return null;
+        }
         final List<Component> result = (List<Component>) query.execute(hash);
         return result.size() == 0 ? null : result.get(0);
     }
 
     /**
      * Creates a new Component.
-     * @param name the name of the Component
-     * @param version the optional version of the Component
-     * @param group the optional group (or vendor) of the Component
-     * @param filename the optional filename
-     * @param md5 the optional MD5 hash
-     * @param sha1 the optional SHA1 hash
-     * @param description an optional description
-     * @param resolvedLicense an optional resolved SPDX license
-     * @param license an optional license name (text)
-     * @param parent an optional parent Component
+     * @param component the Component to persist
      * @param commitIndex specifies if the search index should be committed (an expensive operation)
      * @return a new Component
      */
-    public Component createComponent(String name, String version, String group, String filename, String md5, String sha1,
-                                     String description, License resolvedLicense, String license, Component parent,
-                                     boolean commitIndex) {
-        final Component component = new Component();
-        component.setName(name);
-        component.setVersion(version);
-        component.setGroup(group);
-        component.setFilename(filename);
-        component.setMd5(md5);
-        component.setSha1(sha1);
-        component.setDescription(description);
-        component.setLicense(license);
-        if (resolvedLicense != null) {
-            resolvedLicense = getObjectById(License.class, resolvedLicense.getId());
-        }
-        component.setResolvedLicense(resolvedLicense);
-        component.setParent(parent);
+    public Component createComponent(Component component, boolean commitIndex) {
         final Component result = persist(component);
         SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.CREATE, pm.detachCopy(result)));
         commitSearchIndex(commitIndex, Component.class);
@@ -355,17 +385,21 @@ public class QueryManager extends AlpineQueryManager {
      */
     public Component updateComponent(Component transientComponent, boolean commitIndex) {
         final Component component = getObjectByUuid(Component.class, transientComponent.getUuid());
-        pm.currentTransaction().begin();
         component.setName(transientComponent.getName());
         component.setVersion(transientComponent.getVersion());
         component.setGroup(transientComponent.getGroup());
         component.setFilename(transientComponent.getFilename());
         component.setMd5(transientComponent.getMd5());
         component.setSha1(transientComponent.getSha1());
+        component.setSha256(transientComponent.getSha256());
+        component.setSha512(transientComponent.getSha512());
+        component.setSha3_256(transientComponent.getSha3_256());
+        component.setSha3_512(transientComponent.getSha3_512());
         component.setDescription(transientComponent.getDescription());
         component.setLicense(transientComponent.getLicense());
         component.setResolvedLicense(transientComponent.getResolvedLicense());
         component.setParent(transientComponent.getParent());
+        component.setPurl(transientComponent.getPurl());
         final Component result = persist(component);
         SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.UPDATE, pm.detachCopy(result)));
         commitSearchIndex(commitIndex, Component.class);
@@ -377,18 +411,19 @@ public class QueryManager extends AlpineQueryManager {
      * @param component the Component to delete
      * @param commitIndex specifies if the search index should be committed (an expensive operation)
      */
-    public void recursivelyDeleteComponent(Component component, boolean commitIndex) {
+    public void recursivelyDelete(Component component, boolean commitIndex) {
         if (component.getChildren() != null) {
             for (Component child: component.getChildren()) {
-                recursivelyDeleteComponent(child, false);
+                recursivelyDelete(child, false);
             }
         }
         pm.getFetchPlan().setDetachmentOptions(FetchPlan.DETACH_LOAD_FIELDS);
         final Component result = pm.getObjectById(Component.class, component.getId());
         SingleThreadedEventService.getInstance().publish(new IndexEvent(IndexEvent.Action.DELETE, pm.detachCopy(result)));
 
-        //todo delete dependencies
-        delete(component.getChildren());
+        deleteMetrics(component);
+        deleteDependencies(component);
+        deleteScans(component);
         delete(component);
         commitSearchIndex(commitIndex, Component.class);
     }
@@ -713,6 +748,28 @@ public class QueryManager extends AlpineQueryManager {
     }
 
     /**
+     * Deletes all dependencies for the specified Project.
+     * @param project the Project to delete dependencies of
+     */
+    @SuppressWarnings("unchecked")
+    public void deleteDependencies(Project project) {
+        final Query query = pm.newQuery(Dependency.class, "project == :project");
+        query.getFetchPlan().addGroup(Dependency.FetchGroup.PROJECT_ONLY.name());
+        query.deletePersistentAll(project);
+    }
+
+    /**
+     * Deletes all dependencies for the specified Component.
+     * @param component the Component to delete dependencies of
+     */
+    @SuppressWarnings("unchecked")
+    public void deleteDependencies(Component component) {
+        final Query query = pm.newQuery(Dependency.class, "component == :component");
+        query.getFetchPlan().addGroup(Dependency.FetchGroup.COMPONENT_ONLY.name());
+        query.deletePersistentAll(component);
+    }
+
+    /**
      * Returns the number of Dependency objects for the specified Project.
      * @param project the Project to retrieve dependencies of
      * @return the total number of dependencies for the project
@@ -765,9 +822,6 @@ public class QueryManager extends AlpineQueryManager {
     @SuppressWarnings("unchecked")
     public PaginatedResult getVulnerabilities() {
         final Query query = pm.newQuery(Vulnerability.class);
-        if (orderBy == null) {
-            query.setOrdering("vulnId descending, source ascending");
-        }
         if (filter != null) {
             query.setFilter("vulnId.toLowerCase().matches(:vulnId)");
             final String filterString = ".*" + filter.toLowerCase() + ".*";
@@ -845,6 +899,17 @@ public class QueryManager extends AlpineQueryManager {
     }
 
     /**
+     * Retrieves the current VulnerabilityMetrics
+     * @return a VulnerabilityMetrics object
+     */
+    @SuppressWarnings("unchecked")
+    public List<VulnerabilityMetrics> getVulnerabilityMetrics() {
+        final Query query = pm.newQuery(VulnerabilityMetrics.class);
+        query.setOrdering("year asc, month asc");
+        return execute(query).getList(VulnerabilityMetrics.class);
+    }
+
+    /**
      * Retrieves the most recent PortfolioMetrics.
      * @return a PortfolioMetrics object
      */
@@ -865,6 +930,17 @@ public class QueryManager extends AlpineQueryManager {
         final Query query = pm.newQuery(PortfolioMetrics.class);
         query.setOrdering("lastOccurrence desc");
         return execute(query);
+    }
+
+    /**
+     * Retrieves PortfolioMetrics in ascending order starting with the oldest since the date specified.
+     * @return a List of metrics
+     */
+    @SuppressWarnings("unchecked")
+    public List<PortfolioMetrics> getPortfolioMetricsSince(Date since) {
+        final Query query = pm.newQuery(PortfolioMetrics.class, "lastOccurrence >= :since");
+        query.setOrdering("lastOccurrence asc");
+        return (List<PortfolioMetrics>)query.execute(since);
     }
 
     /**
@@ -893,12 +969,14 @@ public class QueryManager extends AlpineQueryManager {
     }
 
     /**
-     * Deleted all metrics associated for the specified Project.
-     * @param project the Project to delete metrics for
+     * Retrieves ProjectMetrics in ascending order starting with the oldest since the date specified.
+     * @return a List of metrics
      */
-    public void deleteProjectMetrics(Project project) {
-        final Query query = pm.newQuery(ProjectMetrics.class, "project == :project");
-        query.deletePersistentAll(project);
+    @SuppressWarnings("unchecked")
+    public List<ProjectMetrics> getProjectMetricsSince(Project project, Date since) {
+        final Query query = pm.newQuery(PortfolioMetrics.class, "project == :project && lastOccurrence >= :since");
+        query.setOrdering("lastOccurrence asc");
+        return (List<ProjectMetrics>)query.execute(project, since);
     }
 
     /**
@@ -927,15 +1005,95 @@ public class QueryManager extends AlpineQueryManager {
     }
 
     /**
+     * Retrieves ComponentMetrics in ascending order starting with the oldest since the date specified.
+     * @return a List of metrics
+     */
+    @SuppressWarnings("unchecked")
+    public List<ComponentMetrics> getComponentMetricsSince(Component component, Date since) {
+        final Query query = pm.newQuery(PortfolioMetrics.class, "component == :component && lastOccurrence >= :since");
+        query.setOrdering("lastOccurrence asc");
+        return (List<ComponentMetrics>)query.execute(component, since);
+    }
+
+    /**
+     * Synchronizes VulnerabilityMetrics.
+     */
+    public void synchronizeVulnerabilityMetrics(VulnerabilityMetrics metric) {
+        final Query query;
+        final List<VulnerabilityMetrics> result;
+        if (metric.getMonth() == null) {
+            query = pm.newQuery(VulnerabilityMetrics.class, "year == :year && month == null");
+            result = execute(query, metric.getYear()).getList(VulnerabilityMetrics.class);
+        } else {
+            query = pm.newQuery(VulnerabilityMetrics.class, "year == :year && month == :month");
+            result = execute(query, metric.getYear(), metric.getMonth()).getList(VulnerabilityMetrics.class);
+        }
+        if (result.size() == 1) {
+            VulnerabilityMetrics m = result.get(0);
+            m.setCount(metric.getCount());
+            m.setMeasuredAt(metric.getMeasuredAt());
+            persist(m);
+        } else if (result.size() == 0) {
+            persist(metric);
+        } else {
+            delete(result);
+            persist(metric);
+        }
+    }
+
+    /**
+     * Deleted all metrics associated for the specified Project.
+     * @param project the Project to delete metrics for
+     */
+    public void deleteMetrics(Project project) {
+        final Query query = pm.newQuery(ProjectMetrics.class, "project == :project");
+        query.deletePersistentAll(project);
+    }
+
+    /**
+     * Deleted all metrics associated for the specified Component.
+     * @param component the Component to delete metrics for
+     */
+    public void deleteMetrics(Component component) {
+        final Query query = pm.newQuery(ComponentMetrics.class, "component == :component");
+        query.deletePersistentAll(component);
+    }
+
+    /**
+     * Binds the two objects together in a corresponding join table.
+     * @param project a Project object
+     * @param tags a List of Tag objects
+     */
+    @SuppressWarnings("unchecked")
+    public void bind(Project project, List<Tag> tags) {
+        final Query query = pm.newQuery(Tag.class, "projects.contains(:project)");
+        List<Tag> currentProjectTags = (List<Tag>)query.execute(project);
+        pm.currentTransaction().begin();
+        for (Tag tag: currentProjectTags) {
+            if (!tags.contains(tag)) {
+                tag.getProjects().remove(project);
+            }
+        }
+        project.setTags(tags);
+        for (Tag tag: tags) {
+            tag.getProjects().add(project);
+        }
+        pm.currentTransaction().commit();
+    }
+
+    /**
      * Binds the two objects together in a corresponding join table.
      * @param scan a Scan object
      * @param component a Component object
      */
     public void bind(Scan scan, Component component) {
-        pm.currentTransaction().begin();
-        scan.getComponents().add(component);
-        component.getScans().add(scan);
-        pm.currentTransaction().commit();
+        boolean bound = scan.getComponents().stream().anyMatch(s -> s.getId() == scan.getId());
+        if (!bound) {
+            pm.currentTransaction().begin();
+            scan.getComponents().add(component);
+            component.getScans().add(scan);
+            pm.currentTransaction().commit();
+        }
     }
 
     /**
@@ -944,10 +1102,13 @@ public class QueryManager extends AlpineQueryManager {
      * @param vulnerability a Vulnerability object
      */
     public void bind(Component component, Vulnerability vulnerability) {
-        pm.currentTransaction().begin();
-        vulnerability.getComponents().add(component);
-        component.getVulnerabilities().add(vulnerability);
-        pm.currentTransaction().commit();
+        boolean bound = vulnerability.getComponents().stream().anyMatch(c -> c.getId() == component.getId());
+        if (!bound) {
+            pm.currentTransaction().begin();
+            vulnerability.getComponents().add(component);
+            component.getVulnerabilities().add(vulnerability);
+            pm.currentTransaction().commit();
+        }
     }
 
     /**

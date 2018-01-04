@@ -13,12 +13,12 @@
                             <img src="<c:url value="/images/dt.svg"/>" style="width:200px; margin-bottom:20px">
                         </a>
                         <p>
-                            OWASP Dependency-Track is a Software Composition Analysis (SCA) application that
-                            allows organizations to automatically ingest and identify third-party components and any inherited
-                            vulnerabilities from their use.
+                            Dependency-Track is a Software Composition Analysis (SCA) platform that allows
+                            organizations to automatically ingest and identify third-party components and any
+                            inherited vulnerabilities from their use.
                         </p>
                         <p>
-                            <span id="systemAppName"></span> v<strong id="systemAppVersion"></strong>
+                            <span id="systemAppName"></span> v<span id="systemAppVersion"></span>
                         </p>
                         <p>
                             Copyright &copy; Steve Springett. All Rights Reserved.
@@ -29,11 +29,11 @@
                             <img src="<c:url value="/images/dc.svg"/>" style="width:200px; margin-bottom:20px">
                         </a>
                         <p>
-                            OWASP Dependency-Check is a Software Composition Analysis (SCA) utility that uses
+                            Dependency-Check is a Software Composition Analysis (SCA) utility that uses
                             evidence-based analysis to identify project dependencies and determines if they contain
                             publicly disclosed vulnerabilities.
                         <p>
-                            <span id="dcAppName"></span> v<strong id="dcAppVersion"></strong>
+                            <span id="dcAppName"></span> v<span id="dcAppVersion"></span>
                         </p>
                         <p>
                             Copyright &copy; Jeremy Long. All Rights Reserved.
@@ -146,6 +146,32 @@
                         </div>
                         <div>
                             <p id="modal-genericErrorContent"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modal-informational" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-md" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title">Information</h4>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-sm-12 col-md-12">
+                        <div class="pull-left" style="width:70px; min-width:70px; max-width:70px;">
+                            <i class="fa fa-info-circle fa-4x" aria-hidden="true"></i>
+                        </div>
+                        <div>
+                            <p id="modal-infoMessage"></p>
                         </div>
                     </div>
                 </div>

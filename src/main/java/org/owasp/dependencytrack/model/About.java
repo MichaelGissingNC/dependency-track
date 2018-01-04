@@ -1,18 +1,19 @@
 /*
  * This file is part of Dependency-Track.
  *
- * Dependency-Track is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option) any
- * later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Dependency-Track is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU General Public License along with
- * Dependency-Track. If not, see http://www.gnu.org/licenses/.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) Steve Springett. All Rights Reserved.
  */
 package org.owasp.dependencytrack.model;
 
@@ -32,15 +33,17 @@ public class About implements Serializable {
 
     private static final long serialVersionUID = -7573425245706188307L;
 
-    static {
-        Settings.initialize();
-    }
+    private static final String APPLICATION = Config.getInstance().getApplicationName();
+    private static final String VERSION = Config.getInstance().getApplicationVersion();
+    private static final String TIMESTAMP = Config.getInstance().getApplicationBuildTimestamp();
+    private static String DC_APPLICATION;
+    private static String DC_VERSION;
 
-    private static final String APPLICATION = Config.getInstance().getProperty(Config.AlpineKey.APPLICATION_NAME);
-    private static final String VERSION = Config.getInstance().getProperty(Config.AlpineKey.APPLICATION_VERSION);
-    private static final String TIMESTAMP = Config.getInstance().getProperty(Config.AlpineKey.APPLICATION_TIMESTAMP);
-    private static final String DC_APPLICATION = Settings.getString(Settings.KEYS.APPLICATION_NAME);
-    private static final String DC_VERSION = Settings.getString(Settings.KEYS.APPLICATION_VERSION);
+    static {
+        Settings settings = new Settings();
+        DC_APPLICATION = settings.getString(Settings.KEYS.APPLICATION_NAME);
+        DC_VERSION = settings.getString(Settings.KEYS.APPLICATION_VERSION);
+    }
 
 
     public String getApplication() {

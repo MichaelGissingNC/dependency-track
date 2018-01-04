@@ -1,15 +1,27 @@
-FROM tomcat:8.0-jre8-alpine
-MAINTAINER Steve Springett, https://github.com/stevespringett
+FROM openjdk:8-jre-alpine
+LABEL maintainer="steve.springett@owasp.org"
+LABEL vendor="OWASP"
 
-# Remove Tomcat default deployed webapps
-RUN ["rm", "-fr", "/usr/local/tomcat/webapps/docs"]
-RUN ["rm", "-fr", "/usr/local/tomcat/webapps/examples"]
-RUN ["rm", "-fr", "/usr/local/tomcat/webapps/host-manager"]
-RUN ["rm", "-fr", "/usr/local/tomcat/webapps/manager"]
-RUN ["rm", "-fr", "/usr/local/tomcat/webapps/ROOT"]
+ARG APP_DIR=/opt/owasp/dependency-track
+ARG DATA_DIR=/data
+ARG USER=dtrack
 
-COPY ./target/dependency-track.war /usr/local/tomcat/webapps/ROOT.war
+# Create the application directory where Dependency-Track will be installed
+RUN mkdir -p ${APP_DIR}
+
+# Create a user and assign home directory to a non-standard path
+RUN adduser -h ${DATA_DIR} -s bash -D ${USER}
+
+# Specify the user to run commands as
+USER ${USER}
+
+# Copy the compiled WAR to the application directory created above
+COPY ./target/dependency-track-embedded.war ${APP_DIR}
+
+VOLUME ${DATA_DIR}
 
 EXPOSE 8080
 
-CMD ["catalina.sh", "run"]
+# Launch Dependency-Track
+WORKDIR ${APP_DIR}
+CMD java -jar dependency-track-embedded.war

@@ -1,22 +1,25 @@
 /*
  * This file is part of Dependency-Track.
  *
- * Dependency-Track is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option) any
- * later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Dependency-Track is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU General Public License along with
- * Dependency-Track. If not, see http://www.gnu.org/licenses/.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) Steve Springett. All Rights Reserved.
  */
 package org.owasp.dependencytrack.event;
 
 import alpine.event.framework.Event;
+import org.owasp.dependencytrack.model.Component;
+import org.owasp.dependencytrack.model.Project;
 
 /**
  * Defines an Event to update metrics.
@@ -26,15 +29,36 @@ import alpine.event.framework.Event;
  */
 public class MetricsUpdateEvent implements Event {
 
-    private Object target = null;
-
-    // Call this to perform a global metrics update event
-    public MetricsUpdateEvent() {
+    public enum Type {
+        PORTFOLIO,
+        PROJECT,
+        COMPONENT,
+        VULNERABILITY
     }
+
+    private Type type = Type.PORTFOLIO;
+    private Object target = null;
 
     // Call this to perform a metrics update on a specific project or component
     public MetricsUpdateEvent(Object target) {
+        if (target == null) {
+            this.type = Type.PORTFOLIO;
+        } else if (target instanceof Project) {
+            this.type = Type.PROJECT;
+        } else if (target instanceof Component) {
+            this.type = Type.COMPONENT;
+        }
         this.target = target;
+    }
+
+    // Call this to perform metrics not related to the portfolio, projects, or components.
+    // For example, running metrics on vulnerabilities being tracked in the database.
+    public MetricsUpdateEvent(Type type) {
+        this.type = type;
+    }
+
+    public Type getType() {
+        return type;
     }
 
     public Object getTarget() {

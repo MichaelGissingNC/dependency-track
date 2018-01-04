@@ -1,18 +1,19 @@
 /*
  * This file is part of Dependency-Track.
  *
- * Dependency-Track is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option) any
- * later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Dependency-Track is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU General Public License along with
- * Dependency-Track. If not, see http://www.gnu.org/licenses/.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) Steve Springett. All Rights Reserved.
  */
 package org.owasp.dependencytrack.tasks;
 
@@ -30,7 +31,10 @@ import org.owasp.dependencytrack.model.Project;
 import org.owasp.dependencytrack.model.ProjectMetrics;
 import org.owasp.dependencytrack.model.Severity;
 import org.owasp.dependencytrack.model.Vulnerability;
+import org.owasp.dependencytrack.model.VulnerabilityMetrics;
 import org.owasp.dependencytrack.persistence.QueryManager;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -54,12 +58,14 @@ public class MetricsUpdateTask implements Subscriber {
 
             LOGGER.info("Starting metrics update task");
             try (QueryManager qm = new QueryManager()) {
-                if (event.getTarget() == null) {
+                if (MetricsUpdateEvent.Type.PORTFOLIO == event.getType()) {
                     updateMetrics(qm);
                 } else if (event.getTarget() instanceof Project) {
                     updateMetrics(qm, (Project) event.getTarget());
                 } else if (event.getTarget() instanceof Component) {
                     updateMetrics(qm, (Component) event.getTarget());
+                } else if (MetricsUpdateEvent.Type.VULNERABILITY == event.getType()) {
+                    updateVulnerabilitiesMetrics(qm);
                 }
             } catch (Exception ex) {
                 LOGGER.error(ex.getMessage());
@@ -95,23 +101,23 @@ public class MetricsUpdateTask implements Subscriber {
         for (MetricCounters projectMetrics: projectCountersList) {
             // Add individual project metrics to the overall portfolio metrics
             portfolioCounters.projects++;
-            portfolioCounters.critical = portfolioCounters.critical + projectMetrics.critical;
-            portfolioCounters.high = portfolioCounters.high + projectMetrics.high;
-            portfolioCounters.medium = portfolioCounters.medium + projectMetrics.medium;
-            portfolioCounters.low = portfolioCounters.low + projectMetrics.low;
+            portfolioCounters.critical += projectMetrics.critical;
+            portfolioCounters.high += projectMetrics.high;
+            portfolioCounters.medium += projectMetrics.medium;
+            portfolioCounters.low += projectMetrics.low;
 
             // All vulnerabilities
-            portfolioCounters.vulnerabilities = portfolioCounters.vulnerabilities + projectMetrics.chmlTotal();
+            portfolioCounters.vulnerabilities += projectMetrics.chmlTotal();
 
             // All dependant components
-            portfolioCounters.components = portfolioCounters.components + projectMetrics.components;
+            portfolioCounters.components += projectMetrics.components;
 
             // Only vulnerable components
-            portfolioCounters.vulnerableComponents = portfolioCounters.vulnerableComponents + projectMetrics.vulnerableComponents;
+            portfolioCounters.vulnerableComponents += projectMetrics.vulnerableComponents;
 
             // Only vulnerable projects
             if (projectMetrics.chmlTotal() > 0) {
-                portfolioCounters.vulnerableProjects = portfolioCounters.vulnerableProjects + 1;
+                portfolioCounters.vulnerableProjects++;
             }
         }
 
@@ -185,14 +191,14 @@ public class MetricsUpdateTask implements Subscriber {
         for (MetricCounters compMetric: countersList) {
             // Add individual component metrics to the overall project metrics
             counters.components++;
-            counters.critical = counters.critical + compMetric.critical;
-            counters.high = counters.high + compMetric.high;
-            counters.medium = counters.medium + compMetric.medium;
-            counters.low = counters.low + compMetric.low;
-            counters.vulnerabilities = counters.vulnerabilities + counters.chmlTotal();  // todo: is this correct?
+            counters.critical += compMetric.critical;
+            counters.high += compMetric.high;
+            counters.medium += compMetric.medium;
+            counters.low += compMetric.low;
+            counters.vulnerabilities += compMetric.chmlTotal();
 
-            if (counters.chmlTotal() > 0) {
-                counters.vulnerableComponents = counters.vulnerableComponents + 1;
+            if (compMetric.chmlTotal() > 0) {
+                counters.vulnerableComponents++;
             }
         }
 
@@ -266,6 +272,79 @@ public class MetricsUpdateTask implements Subscriber {
             qm.persist(componentMetrics);
         }
         return counters;
+    }
+
+    /**
+     * Performs metric updates on the entire vulnerability database.
+     * @param qm a QueryManager instance
+     */
+    private void updateVulnerabilitiesMetrics(QueryManager qm) {
+        LOGGER.debug("Executing metrics update on vulnerability database");
+        final Date measuredAt = new Date();
+        final VulnerabilityMetricCounters yearMonthCounters = new VulnerabilityMetricCounters(measuredAt, true);
+        final VulnerabilityMetricCounters yearCounters = new VulnerabilityMetricCounters(measuredAt, false);
+        final PaginatedResult vulnsResult = qm.getVulnerabilities();
+        for (Vulnerability vulnerability: vulnsResult.getList(Vulnerability.class)) {
+            if (vulnerability.getCreated() != null) {
+                yearMonthCounters.updateMetics(vulnerability.getCreated());
+                yearCounters.updateMetics(vulnerability.getCreated());
+            } else if (vulnerability.getPublished() != null) {
+                yearMonthCounters.updateMetics(vulnerability.getPublished());
+                yearCounters.updateMetics(vulnerability.getPublished());
+            }
+        }
+        for (VulnerabilityMetrics metric: yearMonthCounters.getMetrics()) {
+            qm.synchronizeVulnerabilityMetrics(metric);
+        }
+        for (VulnerabilityMetrics metric: yearCounters.getMetrics()) {
+            qm.synchronizeVulnerabilityMetrics(metric);
+        }
+    }
+
+    /**
+     * A value object that holds various counters returned by the updating of metrics.
+     */
+    private class VulnerabilityMetricCounters {
+
+        private Date measuredAt;
+        private boolean trackMonth;
+        private List<VulnerabilityMetrics> metrics = new ArrayList<>();
+
+        private VulnerabilityMetricCounters(Date measuredAt, boolean trackMonth) {
+            this.measuredAt = measuredAt;
+            this.trackMonth = trackMonth;
+        }
+
+        private void updateMetics(Date timestamp) {
+            LocalDateTime date = LocalDateTime.ofInstant(timestamp.toInstant(), ZoneId.systemDefault());
+            int year = date.getYear();
+            int month = date.getMonthValue();
+
+            boolean found = false;
+            for (VulnerabilityMetrics metric: metrics) {
+                if (trackMonth && metric.getYear() == year && metric.getMonth() == month) {
+                    metric.setCount(metric.getCount() + 1);
+                    found = true;
+                } else if (!trackMonth && metric.getYear() == year) {
+                    metric.setCount(metric.getCount() + 1);
+                    found = true;
+                }
+            }
+            if (!found) {
+                VulnerabilityMetrics metric = new VulnerabilityMetrics();
+                metric.setYear(year);
+                if (trackMonth) {
+                    metric.setMonth(month);
+                }
+                metric.setCount(1);
+                metric.setMeasuredAt(measuredAt);
+                metrics.add(metric);
+            }
+        }
+
+        private List<VulnerabilityMetrics> getMetrics() {
+            return metrics;
+        }
     }
 
     /**

@@ -1,18 +1,19 @@
 /*
  * This file is part of Dependency-Track.
  *
- * Dependency-Track is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option) any
- * later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Dependency-Track is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU General Public License along with
- * Dependency-Track. If not, see http://www.gnu.org/licenses/.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) Steve Springett. All Rights Reserved.
  */
 
 "use strict";
@@ -27,6 +28,11 @@ const $common = function() {
  * leading edge, instead of the trailing.
  *
  * https://davidwalsh.name/javascript-debounce-function
+ *
+ * @callback callback
+ * @param {callback} func the function to call
+ * @param {number} wait the time to wait
+ * @param {boolean} immediate
  */
 $common.debounce = function debounce(func, wait, immediate) {
     let timeout;
@@ -50,10 +56,8 @@ $common.debounce = function debounce(func, wait, immediate) {
 /**
  * Useful for parsing HREF's
  */
-$common.getLocation = function getLocation(href) {
-    if (href === null) {
-        href = window.location;
-    }
+$common.getLocation = function getLocation(url) {
+    let href = (url === null) ? window.location : url;
     let location = document.createElement("a");
     location.href = href;
     return location;
@@ -77,9 +81,18 @@ $common.isBlank = function isBlank(string) {
 /**
  * Called after we have verified that a user is authenticated (if authentication is enabled)
  */
-function initialize(data) {
-    //todo: check permissions - populate admin and other navigational things accordingly
+$common.initialize = function initialize() {
+    //todo: check permissions - populate admin and other navigational things accordingly - add 'data' to param
     $rest.getVersion(
+        /**
+         * @param {Object} data JSON response object
+         * @param data.application the name of the application
+         * @param data.version the version of the application
+         * @param data.timestamp the timestamp in which the application was built
+         * @param data.dependencyCheck.application the name of Dependency-Check
+         * @param data.dependencyCheck.version the version of Dependency-Check
+         * @method $ jQuery selector
+         */
         function onVersionSuccess(data) {
             // Populates teh system modeal with general app info
             $("#systemAppName").html(data.application);
@@ -93,20 +106,22 @@ function initialize(data) {
             }
         }
     );
-}
+};
 
 /**
  * Logout function removes the stored jwt token and reloads the page, which will
  * force the login modal to display
  */
-function logout() {
+$common.logout = function logout() {
     $.sessionStorage.remove("token");
     location.reload();
-}
-//######################################################################################################################
+};
+
 /**
  * Executed when the login button is clicked. Prevent the form from actually being
  * submitted and uses javascript to submit the form info.
+ *
+ * @method $ jQuery selector
  */
 $("#login-form").submit(function(event) {
     event.preventDefault();
@@ -120,7 +135,7 @@ $("#login-form").submit(function(event) {
         $("#sidebar").css("display", "block");
         $(".main").css("display", "block");
         $("#modal-login").modal("hide");
-        initialize();
+        $common.initialize();
     }, function(data) {
         // todo: Display invalid username or password somewhere
     });
@@ -129,101 +144,43 @@ $("#login-form").submit(function(event) {
 });
 
 /**
- * Executed when the DOM is ready for JavaScript to be executed.
- */
-$(document).ready(function () {
-
-    // Initialize all tooltips
-    $('[data-toggle="tooltip"]').tooltip();
-
-    // Get information about the current logged in user (if available)
-    $rest.getPrincipalSelf(initialize);
-    let contextPath = $rest.contextPath();
-
-    /**
-     * Function that adds the 'active' class to one of the buttons in
-     * the sidebar based on the data-sidebar attribute in the pages' body.
-     */
-    (function() {
-        let nav = document.getElementById("sidebar"),
-            anchors = nav.getElementsByTagName("a"),
-            bodySidebar = document.body.getAttribute("data-sidebar");
-
-        for (let i = 0; i < anchors.length; i++) {
-            if(bodySidebar === anchors[i].getAttribute("data-sidebar")) {
-                anchors[i].parentElement.className = "active";
-            }
-        }
-    })();
-
-    $("#smart-search .typeahead").typeahead(null,
-        {
-            name: "project",
-            source: $rest.smartsearchProject(),
-            display: "name",
-            templates: {
-                header: '<h4 class="section-title">Projects</h4>',
-                suggestion: function (data) {
-                    return '<a class="tt-suggestion-item" href="' + contextPath + 'project/?uuid=' + data.uuid + '">' + data.name + '</a>';
-                }
-            }
-        },
-        {
-            name: "component",
-            source: $rest.smartsearchComponent(),
-            display: "name",
-            templates: {
-                header: '<h4 class="section-title">Components</h4>',
-                suggestion: function (data) {
-                    return '<a class="tt-suggestion-item" href="' + contextPath + 'component/?uuid=' + data.uuid + '">' + data.name + '</a>';
-                }
-            }
-        },
-        {
-            name: "vulnerability",
-            source: $rest.smartsearchVulnerability(),
-            display: "vulnId",
-            templates: {
-                header: '<h4 class="section-title">Vulnerabilities</h4>',
-                suggestion: function (data) {
-                    return '<a class="tt-suggestion-item" href="' + contextPath + 'vulnerability/?source=' + data.source + '&vulnId=' + data.vulnId + '">' + data.vulnId + '</a>';
-                }
-            }
-        },
-        {
-            name: "license",
-            source: $rest.smartsearchLicense(),
-            display: "name",
-            templates: {
-                header: '<h4 class="section-title">Licenses</h4>',
-                suggestion: function (data) {
-                    return '<a class="tt-suggestion-item" href="' + contextPath + 'license/?licenseId=' + data.licenseId + '">' + data.name + '</a>';
-                }
-            }
-        }
-    );
-
-});
-
-/**
  * Displays an error modal with the specified message. If the responseText
  * from an AJAX response is available, that text will be used. If not, the
  * fallback message will be used instead.
  */
-function displayErrorModal(xhr, fallbackMessage) {
+$common.displayErrorModal = function displayErrorModal(xhr, fallbackMessage) {
     let message = fallbackMessage;
     if (xhr && xhr.responseText && xhr.responseText.trim()) {
         message = xhr.responseText.trim();
     }
     $("#modal-genericError").modal("show");
     $("#modal-genericErrorContent").html(message);
-}
+};
+
+/**
+ * Displays an informational modal with the specified message.
+ */
+$common.displayInfoModal = function displayInfoModal(message) {
+    $("#modal-informational").modal("show");
+    $("#modal-infoMessage").html(message);
+};
+
+/**
+ * Creates an informational, single-color progress bar.
+ */
+$common.generateProgressBar = function generateProgressBar(count, total) {
+    let percent = (count/total)*100;
+    let block = '<span class="progress">';
+    block += '<div class="progress-bar severity-info-bg" data-toggle="tooltip" data-placement="top" title="' + count + '" style="width:' + percent + '%">' + count + '</div>';
+    block += '</span>';
+    return block;
+};
 
 /**
  * Creates a multi-color progress bar consisting of the number of
  * critical, high, medium, and low severity vulnerabilities.
  */
-function generateSeverityProgressBar(critical, high, medium, low) {
+$common.generateSeverityProgressBar = function generateSeverityProgressBar(critical, high, medium, low) {
     let percentCritical = (critical/(critical+high+medium+low))*100;
     let percentHigh = (high/(critical+high+medium+low))*100;
     let percentMedium = (medium/(critical+high+medium+low))*100;
@@ -246,34 +203,38 @@ function generateSeverityProgressBar(critical, high, medium, low) {
     }
     block += '</span>';
     return block;
-}
+};
 
 /**
  * Given a UNIX timestamp, this function will return a formatted date.
  * i.e. 15 Jan 2017
  */
-function formatTimestamp(timestamp) {
+$common.formatTimestamp = function formatTimestamp(timestamp, includeTime) {
     let date = new Date(timestamp);
     let months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return date.getDate() + " " + months[date.getMonth()] + " " + date.getFullYear();
-}
+    if (includeTime) {
+        return date.getDate() + " " + months[date.getMonth()] + " " + date.getFullYear() + " at " + date.getHours() + ":" + date.getMinutes() + ":" + date.getSeconds();
+    } else {
+        return date.getDate() + " " + months[date.getMonth()] + " " + date.getFullYear();
+    }
+};
 
 /**
  * Formats and returns a specialized label for a vulnerability source (NVD, NSP, VulnDB, etc).
  */
-function formatSourceLabel(source) {
+$common.formatSourceLabel = function formatSourceLabel(source) {
     let sourceClass = "label-source-" + source.toLowerCase();
     return `<span class="label ${sourceClass}">${source}</span>`;
-}
+};
 
 /**
  * Formats and returns a specialized label for the severity of a vulnerability.
  */
-function formatSeverityLabel(severity) {
+$common.formatSeverityLabel = function formatSeverityLabel(severity) {
     if (!severity) {
-        return;
+        return "";
     }
-    let severityLabel = capitalize(severity);
+    let severityLabel = $common.capitalize(severity);
     let severityClass = "severity-" + severity.toLowerCase() + "-bg";
 
     return `
@@ -285,31 +246,161 @@ function formatSeverityLabel(severity) {
              <div style="font-size:12px; padding:4px"><span class="severity-value">${severityLabel}</span></div>
          </div>
      </div>`;
-}
+};
 
 /**
  * Changes the first letter to uppercase and the remaining letters to lowercase.
+ *
+ * @param {string} string the String to capitalize
  */
-function capitalize(string) {
+$common.capitalize = function capitalize(string) {
     if (string && string.length > 2) {
         return string.charAt(0).toUpperCase() + string.slice(1).toLowerCase();
     }
     return string;
-}
+};
+
+/**
+ * Helper function that returns the variable if it is not null, undefined, NaN,
+ * an empty string (""), 0, or false. Otherwise, returns the default value.
+ */
+$common.valueWithDefault = function valueWithDefault(variable, defaultValue) {
+    if (variable) {
+        return variable;
+    } else {
+        return defaultValue;
+    }
+};
 
 /**
  * Given a comma-separated string, creates an array of objects.
  */
-function csvStringToObjectArray(csvString) {
+$common.csvStringToObjectArray = function csvStringToObjectArray(csvString) {
     let csvArray = [];
     if (!$common.isEmpty(csvString)) {
         let tmpArray = csvString.split(",");
         for (let i in tmpArray) {
-            csvArray.push({name: tmpArray[i]});
+            if (tmpArray.hasOwnProperty(i)) {
+                csvArray.push({name: tmpArray[i]});
+            }
         }
     }
     return csvArray;
-}
+};
+
+/**
+ * Perform client-side JSON escaping
+ */
+$common.toHtml = function toHtml(string) {
+    if(typeof string === "string") {
+        return String(string).replace(/[&<>"'\/]/g, function (s) {
+            return __entityMap[s];
+        });
+    } else {
+        return string;
+    }
+};
+
+/**
+ * Executed when the DOM is ready for JavaScript to be executed.
+ */
+$(document).ready(function () {
+
+    // Initialize all tooltips
+    $('[data-toggle="tooltip"]').tooltip();
+
+    // Get information about the current logged in user (if available)
+    $rest.getPrincipalSelf($common.initialize);
+    let contextPath = $rest.contextPath();
+
+    /**
+     * Function that adds the 'active' class to one of the buttons in
+     * the sidebar based on the data-sidebar attribute in the pages' body.
+     */
+    (function() {
+        let nav = document.getElementById("sidebar"),
+            anchors = nav.getElementsByTagName("a"),
+            bodySidebar = document.body.getAttribute("data-sidebar");
+
+        for (let i = 0; i < anchors.length; i++) {
+            if(bodySidebar === anchors[i].getAttribute("data-sidebar")) {
+                anchors[i].parentElement.className = "active";
+            }
+        }
+    })();
+
+    $("#smart-search-input").typeahead(null,
+        {
+            name: "project",
+            source: $rest.smartsearchProject(),
+            display: "name",
+            templates: {
+                header: '<h4 class="section-title">Projects</h4>',
+                /**
+                 * @param data the JSON data returned
+                 * @param data.uuid the UUID of the object
+                 * @param data.name the name of the object
+                 * @returns {string}
+                 */
+                suggestion: function (data) {
+                    return '<a class="tt-suggestion-item" href="' + contextPath + 'project/?uuid=' + data.uuid + '">' + data.name + '</a>';
+                }
+            }
+        },
+        {
+            name: "component",
+            source: $rest.smartsearchComponent(),
+            display: "name",
+            templates: {
+                header: '<h4 class="section-title">Components</h4>',
+                /**
+                 * @param data the JSON data returned
+                 * @param data.uuid the UUID of the object
+                 * @param data.name the name of the object
+                 * @returns {string}
+                 */
+                suggestion: function (data) {
+                    return '<a class="tt-suggestion-item" href="' + contextPath + 'component/?uuid=' + data.uuid + '">' + data.name + '</a>';
+                }
+            }
+        },
+        {
+            name: "vulnerability",
+            source: $rest.smartsearchVulnerability(),
+            display: "vulnId",
+            templates: {
+                header: '<h4 class="section-title">Vulnerabilities</h4>',
+                /**
+                 * @param data the JSON data returned
+                 * @param data.source the source of of the vulnerability
+                 * @param data.vulnId the ID unique to the source
+                 * @returns {string}
+                 */
+                suggestion: function (data) {
+                    return '<a class="tt-suggestion-item" href="' + contextPath + 'vulnerability/?source=' + data.source + '&vulnId=' + data.vulnId + '">' + data.vulnId + '</a>';
+                }
+            }
+        },
+        {
+            name: "license",
+            source: $rest.smartsearchLicense(),
+            display: "name",
+            templates: {
+                header: '<h4 class="section-title">Licenses</h4>',
+                /**
+                 * @param data the JSON data returned
+                 * @param data.licenseId unique license ID
+                 * @param data.name the name of the object
+                 * @returns {string}
+                 */
+                suggestion: function (data) {
+                    return '<a class="tt-suggestion-item" href="' + contextPath + 'license/?licenseId=' + data.licenseId + '">' + data.name + '</a>';
+                }
+            }
+        }
+    );
+
+});
 
 /**
  * Defines JSON characters that need to be escaped when data is used in HTML
@@ -322,20 +413,6 @@ const __entityMap = {
     "'": "&#39;",
     "/": "&#x2F;"
 };
-
-/**
- * Perform client-side JSON escaping
- */
-
-function toHtml(string) {
-    if(typeof string === "string") {
-        return String(string).replace(/[&<>"'\/]/g, function (s) {
-            return __entityMap[s];
-        });
-    } else {
-        return string;
-    }
-}
 
 /**
  * Extends JQuery

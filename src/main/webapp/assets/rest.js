@@ -1,18 +1,19 @@
 /*
  * This file is part of Dependency-Track.
  *
- * Dependency-Track is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option) any
- * later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Dependency-Track is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU General Public License along with
- * Dependency-Track. If not, see http://www.gnu.org/licenses/.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) Steve Springett. All Rights Reserved.
  */
 
 "use strict";
@@ -21,8 +22,8 @@
  * Constants
  */
 const CONTENT_TYPE_JSON = "application/json";
-const CONTENT_TYPE_TEXT = "text/plain";
-const TOTAL_COUNT_HEADER = "X-Total-Count";
+//const CONTENT_TYPE_TEXT = "text/plain";
+//const TOTAL_COUNT_HEADER = "X-Total-Count";
 const DATA_TYPE = "json";
 const METHOD_GET = "GET";
 const METHOD_POST = "POST";
@@ -61,6 +62,12 @@ $rest.smartsearchProject = function smartsearch() {
         remote: {
             url: $rest.contextPath() + URL_SEARCH + "/%QUERY",
             wildcard: '%QUERY',
+            /**
+             * @param {Object} response the JSON response
+             * @param response.results
+             * @param response.results.project
+             * @returns {*}
+             */
             filter: function(response) {
                 return response.results.project;
             }
@@ -79,6 +86,12 @@ $rest.smartsearchComponent = function smartsearch() {
         remote: {
             url: $rest.contextPath() + URL_SEARCH + "/%QUERY",
             wildcard: '%QUERY',
+            /**
+             * @param {Object} response the JSON response
+             * @param response.results
+             * @param response.results.component
+             * @returns {*}
+             */
             filter: function(response) {
                 return response.results.component;
             }
@@ -97,6 +110,12 @@ $rest.smartsearchVulnerability = function smartsearch() {
         remote: {
             url: $rest.contextPath() + URL_SEARCH + "/%QUERY",
             wildcard: '%QUERY',
+            /**
+             * @param {Object} response the JSON response
+             * @param response.results
+             * @param response.results.vulnerability
+             * @returns {*}
+             */
             filter: function(response) {
                 return response.results.vulnerability;
             }
@@ -115,6 +134,12 @@ $rest.smartsearchLicense = function smartsearch() {
         remote: {
             url: $rest.contextPath() + URL_SEARCH + "/%QUERY",
             wildcard: '%QUERY',
+            /**
+             * @param {Object} response the JSON response
+             * @param response.results
+             * @param response.results.license
+             * @returns {*}
+             */
             filter: function(response) {
                 return response.results.license;
             }
@@ -579,7 +604,26 @@ $rest.getVulnerabilityByVulnId = function getVulnerabilityByName(source, vulnId,
 };
 
 /**
- * Service called to retrieve current metrics the entire portfolio
+ * Service called to retrieve vulnerability metrics
+ */
+$rest.getVulnerabilityMetrics = function getVulnerabilityMetrics(successCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_METRICS + "/vulnerability",
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_GET,
+        statusCode: {
+            200: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            }
+        }
+    });
+};
+
+/**
+ * Service called to retrieve current metrics for the entire portfolio
  */
 $rest.getPortfolioCurrentMetrics = function getPortfolioCurrentMetrics(successCallback, failCallback) {
     $.ajax({
@@ -603,11 +647,60 @@ $rest.getPortfolioCurrentMetrics = function getPortfolioCurrentMetrics(successCa
 };
 
 /**
- * Service called to retrieve current metrics for a specific component
+ * Service called to retrieve historical metrics for the entire portfolio
+ */
+$rest.getPortfolioMetrics = function getPortfolioMetrics(daysBack, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_METRICS + "/portfolio/" + daysBack + "/days",
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_GET,
+        statusCode: {
+            200: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            404: function(data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
+                }
+            }
+        }
+    });
+};
+
+
+/**
+ * Service called to retrieve current metrics for a specific project
  */
 $rest.getProjectCurrentMetrics = function getProjectCurrentMetrics(uuid, successCallback, failCallback) {
     $.ajax({
         url: $rest.contextPath() + URL_METRICS + "/project/" + uuid + "/current",
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_GET,
+        statusCode: {
+            200: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            404: function(data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
+                }
+            }
+        }
+    });
+};
+
+/**
+ * Service called to retrieve historical metrics for a specific project
+ */
+$rest.getProjectMetrics = function getProjectMetrics(uuid, daysBack, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_METRICS + "/project/" + uuid + "/days/" + daysBack,
         contentType: CONTENT_TYPE_JSON,
         dataType: DATA_TYPE,
         type: METHOD_GET,
@@ -632,6 +725,102 @@ $rest.getProjectCurrentMetrics = function getProjectCurrentMetrics(uuid, success
 $rest.getComponentCurrentMetrics = function getComponentCurrentMetrics(uuid, successCallback, failCallback) {
     $.ajax({
         url: $rest.contextPath() + URL_METRICS + "/component/" + uuid + "/current",
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_GET,
+        statusCode: {
+            200: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            404: function(data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
+                }
+            }
+        }
+    });
+};
+
+/**
+ * Service called to retrieve historical metrics for a specific component
+ */
+$rest.getComponentMetrics = function getComponentMetrics(uuid, daysBack, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_METRICS + "/component/" + uuid + "/days/" + daysBack,
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_GET,
+        statusCode: {
+            200: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            404: function(data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
+                }
+            }
+        }
+    });
+};
+
+/**
+ * Service called to refresh metrics for the entire portfolio
+ */
+$rest.refreshPortfolioMetrics = function refreshPortfolioMetrics(successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_METRICS + "/portfolio/refresh",
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_GET,
+        statusCode: {
+            200: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            404: function(data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
+                }
+            }
+        }
+    });
+};
+
+/**
+ * Service called to refresh metrics for a specific project
+ */
+$rest.refreshProjectMetrics = function refreshProjectMetrics(uuid, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_METRICS + "/project/" + uuid + "/refresh",
+        contentType: CONTENT_TYPE_JSON,
+        dataType: DATA_TYPE,
+        type: METHOD_GET,
+        statusCode: {
+            200: function(data) {
+                if (successCallback) {
+                    $rest.callbackValidator(successCallback(data));
+                }
+            },
+            404: function(data) {
+                if (failCallback) {
+                    $rest.callbackValidator(failCallback(data));
+                }
+            }
+        }
+    });
+};
+
+/**
+ * Service called to refresh metrics for a specific component
+ */
+$rest.refreshComponentMetrics = function refreshComponentMetrics(uuid, successCallback, failCallback) {
+    $.ajax({
+        url: $rest.contextPath() + URL_METRICS + "/component/" + uuid + "/refresh",
         contentType: CONTENT_TYPE_JSON,
         dataType: DATA_TYPE,
         type: METHOD_GET,
@@ -1034,11 +1223,20 @@ $rest.removeUserFromTeam = function removeUserFromTeam(username, teamuuid, succe
 $.ajaxSetup({
     beforeSend: function(xhr) {
         let jwt = $.sessionStorage.get("token");
-        if (jwt != null) {
+        if (jwt !== null) {
             xhr.setRequestHeader("Authorization", "Bearer " + jwt);
         }
     },
+    error: function(xhr, textStatus) {
+        if(textStatus === "timeout") {
+            $common.displayErrorModal(xhr, "The server is not responding. Please try again or contact the administrator.");
+        }
+    },
+    timeout: 10000,
     statusCode: {
+        /**
+         * @method $ jQuery selector
+         */
         200: function() {
             $("#navbar-container").css("display", "block");
             $("#sidebar").css("display", "block");
@@ -1046,8 +1244,11 @@ $.ajaxSetup({
             $("#modal-login").modal("hide");
         },
         400: function(xhr) {
-            displayErrorModal(xhr, "The request made was incorrect or not in the proper format (400).");
+            $common.displayErrorModal(xhr, "The request made was incorrect or not in the proper format (400).");
         },
+        /**
+         * @method $ jQuery selector
+         */
         401: function() {
             $("#navbar-container").css("display", "none");
             $("#sidebar").css("display", "none");
@@ -1056,16 +1257,16 @@ $.ajaxSetup({
             $("#username").focus();
         },
         403: function(xhr) {
-            displayErrorModal(xhr, "The request is forbidden (403).");
+            $common.displayErrorModal(xhr, "The request is forbidden (403).");
         },
         404: function(xhr) {
-            displayErrorModal(xhr, "The requested object could not be found (404).");
+            $common.displayErrorModal(xhr, "The requested object could not be found (404).");
         },
         409: function(xhr) {
-            displayErrorModal(xhr, "A conflict occurred preventing the request from being processed (409).");
+            $common.displayErrorModal(xhr, "A conflict occurred preventing the request from being processed (409).");
         },
         500: function() {
-            displayErrorModal(null, "An unexpected error occurred. Please contact the Dependency-Track administrator for assistance (500).");
+            $common.displayErrorModal(null, "An unexpected error occurred. Please contact the Dependency-Track administrator for assistance (500).");
         }
     }
 });
